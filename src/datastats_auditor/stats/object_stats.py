@@ -240,14 +240,12 @@ class ObjectStats:
                                 "max": self.df["bbox_area_norm"].max()
                                 }
         bbox_stats_aspect_ratio = {"mean": self.df["bbox_aspect_ratio"].mean(),
-                                    "mean": self.df["bbox_aspect_ratio"].mean(),
                                     "median": self.df["bbox_aspect_ratio"].median(),
                                     "std": self.df["bbox_aspect_ratio"].std(),
                                     "min": self.df["bbox_aspect_ratio"].min(),
                                     "max": self.df["bbox_aspect_ratio"].max()
                                 }
         bbox_stats_height = {"mean": self.df["bbox_h"].mean(),
-                            "mean": self.df["bbox_h"].mean(),
                             "median": self.df["bbox_h"].median(),
                             "std": self.df["bbox_h"].std(),
                             "min": self.df["bbox_h"].min(),
@@ -265,34 +263,24 @@ class ObjectStats:
                                 "min": self.df["center_x"].min(),
                                 "max": self.df["center_x"].max()
                             }
-                        "center_y": {
-                                        "mean": self.df["center_y"].mean(),
-                                        "median": self.df["center_y"].median(),
-                                        "std": self.df["center_y"].std(),
-                                        "min": self.df["center_y"].min(),
-                                        "max": self.df["center_y"].max()
-                                    },
-                        "center_x_norm": {
-                                        "mean": self.df["center_x_norm"].mean(),
+        bbox_stats_center_y =   {"mean": self.df["center_y"].mean(),
+                                "median": self.df["center_y"].median(),
+                                "std": self.df["center_y"].std(),
+                                "min": self.df["center_y"].min(),
+                                "max": self.df["center_y"].max()
+                                }
+        bbox_stats_center_x_norm  =   {"mean": self.df["center_x_norm"].mean(),
                                         "median": self.df["center_x_norm"].median(),
                                         "std": self.df["center_x_norm"].std(),
                                         "min": self.df["center_x_norm"].min(),
                                         "max": self.df["center_x_norm"].max()
-                                    },
-                        "center_y_norm": {
-                                        "mean": self.df["center_y_norm"].mean(),
-                                        "median": self.df["center_y_norm"].median(),
-                                        "std": self.df["center_y_norm"].std(),
-                                        "min": self.df["center_y_norm"].min(),
-                                        "max": self.df["center_y_norm"].max()
                                     }
-                    }    
-        
-        {"objects_area_stats": objects_area_stats,
-         "objects_area_norm_stats": objects_area_norm_stats,
-         "objects_aspect_ratio_stats": objects_aspect_ratio_stats,
-         "bbox_stats": bbox_stats
-        }
+        bbox_stats_center_y_norm =  {"mean": self.df["center_y_norm"].mean(),
+                                    "median": self.df["center_y_norm"].median(),
+                                    "std": self.df["center_y_norm"].std(),
+                                    "min": self.df["center_y_norm"].min(),
+                                    "max": self.df["center_y_norm"].max()
+                                    }
         
         objects_stats = {"area": objects_area_stats,
                         "area_norm": objects_area_norm_stats,
@@ -304,6 +292,20 @@ class ObjectStats:
                         "center_x_norm": objects_center_x_norm,
                         "center_y_norm": objects_center_y_norm
                         }
-         "bbox_stats": {}
-        }
+        bbox_stats = {"aspect_ratio": bbox_stats_aspect_ratio,
+                       "area": bbox_stats_area,
+                       "area_norm": bbox_stats_area_norm,
+                        "height": bbox_stats_height,
+                        "width": bbox_stats_width,
+                        "center_x": bbox_stats_center_x,
+                        "center_y": bbox_stats_center_y,
+                        "center_x_norm": bbox_stats_center_x_norm,
+                        "center_y_norm": bbox_stats_center_y_norm
+                        }
+        
+        result = {"objects_stats": objects_stats,
+                    "bbox_stats": bbox_stats
+                }
+        return result
+        
     
