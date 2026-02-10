@@ -10,7 +10,10 @@ import numpy as np
 import pandas as pd
 from pandas import json_normalize
 import json
-
+from dataclasses import dataclass
+from typings import Dict, Union, List, Optional
+from datastats_auditor.src.datastats_auditor.stats.image_stats import ImageBatchDataset
+from datastats_auditor.stats.image_stats import compute_dataset_stats, estimate_image_memory_size_GB, get_memory_info
 
 #%%
 def coco_annotation_to_df(coco_annotation_file):
@@ -475,3 +478,58 @@ class ObjectStats:
     
     
     
+# %%
+ann_df = coco_annotation_to_df(train_annfile)
+objstats = ObjectStats(ann_df=ann_df, n_bins=5, strategy="equal")
+
+
+
+# %%
+summary = objstats.summary()
+# %%
+summary
+# %%
+
+@dataclass
+class SplitInputStore:
+    train: Union[str, Path]  # annotation file path
+    val: Union[str, Path]
+    test: Union[str, Path]  
+
+@dataclass
+class ImageStatsResult:
+    ...
+
+@dataclass
+class ObjectStatsResult:
+    ...
+    
+    
+class SplitStats:
+    def __init__(self, object_stats: ObjectStats,
+                 image_stats: ImageBatchDataset,
+                 object_stats_kwargs: Optional[Dict] = None,
+                 image_stats_kwargs: Optional[Dict] = None,
+                 **kwargs
+                 ):
+        self.object_stats = object_stats
+        self.image_stats = image_stats
+        
+        imagestat_results = ImageStatsResult()
+        for split_nm, split_param in image_stats_kwargs.items():
+            dataset = ImageBatchDataset(**split_param)
+            imagestat_results = compute_dataset_stats(dataset)
+            setattr(imagestat_results, split_nm, imagestat_results)
+        
+        objectstat_results = ObjectStatsResult()
+        for split_nm, split_param in object_stats_kwargs.items():
+            ann_df = coco_annotation_to_df(split_param["ann_file"])
+            objstats = ObjectStats(ann_df=ann_df, **split_param)
+            objstats_summary = objstats.summary()
+            setattr(objectstat_results, split_nm, objstats_summary)    
+        
+        self.object_stats_results = objectstat_results
+        self.image_stats_results = imagestat_results
+        
+        
+        
