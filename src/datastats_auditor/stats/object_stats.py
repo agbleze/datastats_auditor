@@ -97,8 +97,9 @@ objects_per_image = train_annot_df.groupby("image_id").size()
 avg_objects = objects_per_image.mean()
 avg_objects
 
-images_per_object = train_annot_df.groupby("category_name").size()
-images_per_object_ratio = images_per_object / images_per_object.sum()
+num_imgs = train_annot_df["image_id"].nunique()
+images_per_object = train_annot_df.groupby("category_name")["image_id"].nunique()
+images_per_object_ratio = images_per_object / num_imgs
 
 small_objects = train_annot_df[train_annot_df["bbox_area_norm"] < 0.01]
 small_ratio = len(small_objects) / len(train_annot_df)
@@ -116,13 +117,25 @@ train_annot_df.groupby("category_name")["foreground_ratio"].mean()
 
 train_annot_df.groupby("category_name")["bbox_area_norm"].mean()
 
+#%%
 
+train_annot_df.image_id.nunique()
+
+#%%
+
+train_annot_df.groupby("category_name")["image_id"].nunique().sum()
 # %%
 
 class ObjectStats:
-    def __init__(self, ann_df):
+    def __init__(self, ann_df, bins=None, n_bins=5, strategy="quantile"):
         self.df = ann_df.copy()
         self._prepare()
+        if not bins:
+            bins = self.compute_area_bins(n_bins=n_bins, strategy=strategy)
+        self.bins = bins
+        self.area_bin_labels = [f"[{bins[i]:.4f}, {bins[i+1]:.4f})" for i in range(len(bins)-1)]
+        self.df = self.assign_area_bins(bins, self.area_bin_labels)
+            
         
     def _prepare(self):
         self.df.dropna(inplace=True)
@@ -143,6 +156,9 @@ class ObjectStats:
         self.df["center_x_norm"] = self.df["center_x"] / self.df["image_width"]
         self.df["center_y_norm"] = self.df["center_y"] / self.df["image_height"]
         
+        self.df["foreground_ratio"] = self.df["bbox_area"] / (self.df["image_width"] * self.df["image_height"]) 
+        
+               
 
     def class_distribution(self):
         counts = self.df["category_name"].value_counts()
@@ -307,5 +323,155 @@ class ObjectStats:
                     "bbox_stats": bbox_stats
                 }
         return result
+    
+    def spatial_distribution(self, bins=20):
+        heatmap, xedges, yedges = np.histogram2d(self.df["center_x_norm"], 
+                                                 self.df["center_y_norm"], 
+                                                 bins=bins, range=[[0, 1], [0, 1]]
+                                                 )
+        res = {
+            "heatmap": heatmap,
+            "xedges": xedges,
+            "yedges": yedges
+        }
+        return res
+    
+    def co_occurence(self):
+        img_to_classes = (self.df.groupby("image_id")["category_name"]
+                          .apply(lambda x: list(set(x)))
+                          )
+        matrix = pd.crosstab(img_to_classes.index.repeat(img_to_classes.str.len()),
+                             np.concatenate(img_to_classes.values)
+                             )
+        co_matrix = matrix.T.dot(matrix)
+        return co_matrix
+    
+    
+    def difficulty(self, small_object_threshold=0.01,
+                   large_object_threshold=0.5
+                   ):
+        objects_per_image = self.df.groupby("image_id").size()
+        avg_objects = objects_per_image.mean()
+        min_object_per_image = objects_per_image.min()
+        max_object_per_image = objects_per_image.max()
+        median_objects_per_image = objects_per_image.median()
+
+        num_imgs = self.df["image_id"].nunique()
+        images_per_object = self.df.groupby("category_name")["image_id"].nunique()
+        images_per_object_ratio = images_per_object / num_imgs
+
+        small_objects = self.df[self.df["bbox_area_norm"] <= small_object_threshold]
+        small_ratio = len(small_objects) / len(self.df)
+        large_objects = self.df[self.df["bbox_area_norm"] >= large_object_threshold]
+        large_ratio = len(large_objects) / len(self.df)
+        medium_objects = self.df[(self.df["bbox_area_norm"] > small_object_threshold) & (self.df["bbox_area_norm"] < large_object_threshold)]
+        medium_ratio = len(medium_objects) / len(self.df)
+
+        clutter_score = objects_per_image.mean() / (self.df["image_width"] * self.df["image_height"]).mean()
+
+        foreground_ratio_mean = self.df["foreground_ratio"].mean()
+        foreground_ratio_min = self.df["foreground_ratio"].min()
+        foreground_ratio_max = self.df["foreground_ratio"].max()
+        foreground_ratio_median = self.df["foreground_ratio"].median()
+        foreground_ratio_std = self.df["foreground_ratio"].std()
+
+
+        object_foreground_ratio_mean = self.df.groupby("category_name")["foreground_ratio"].mean().to_dict()
+        object_foreground_ratio_max = self.df.groupby("category_name")["foreground_ratio"].max().to_dict()
+        object_foreground_ratio_min = self.df.groupby("category_name")["foreground_ratio"].min().to_dict()
+        object_foreground_ratio_median = self.df.groupby("category_name")["foreground_ratio"].median().to_dict()
+        object_foreground_ration_std = self.df.groupby("category_name")["foreground_ratio"].std().to_dict()
+
+        bbox_area_bins_ratio = self.df["area_bin_label"].value_counts(normalize=True).to_dict()
+        object_bbox_area_per_bins = self.df.groupby(["area_bin_label", "category_name"]).size().unstack(fill_value=0)
         
+        bbox_stats = {"objects_in_image": {"mean": avg_objects,
+                                            "min": min_object_per_image,
+                                            "max": max_object_per_image,
+                                            "median": median_objects_per_image,
+                                            "std": objects_per_image.std()
+                                            },
+                      "foreground_ratio": {"mean": foreground_ratio_mean,
+                                            "min": foreground_ratio_min,
+                                            "max": foreground_ratio_max,
+                                            "median": foreground_ratio_median,
+                                            "std": foreground_ratio_std
+                                            },
+                      "small_object": {"ratio": small_ratio},
+                      "medium_object": {"ratio": medium_ratio},
+                      "large_object": {"ratio": large_ratio},
+                      "bbox_area_ratio_per_bin": bbox_area_bins_ratio,
+                      "clutter_score": clutter_score,                      
+                      }
+        
+        object_stats = {"images_per_object_ratio": images_per_object_ratio.to_dict(),
+                        "foreground_ratio": {"mean": object_foreground_ratio_mean,
+                                            "min": object_foreground_ratio_min,
+                                            "max": object_foreground_ratio_max,
+                                            "median": object_foreground_ratio_median,
+                                            "std": object_foreground_ration_std
+                                            },
+                        "bbox_area_ratio_per_bin": object_bbox_area_per_bins.to_dict()
+                        }
+        
+        self.difficulty_metrics ={"bbox_stats": bbox_stats, "object_stats": object_stats}
+        
+        return self.difficulty_metrics
+    
+    def summary(self):
+        class_dist = self.class_distribution()
+        bbox_geom = self.bbox_geometry()
+        spatial_dist = self.spatial_distribution()
+        co_occurence = self.co_occurence()
+        difficulty = self.difficulty()
+        
+        summary = {"class_distribution": class_dist,
+                    "bbox_geometry": bbox_geom,
+                    "spatial_distribution": spatial_dist,
+                    "co_occurence": co_occurence,
+                    "difficulty": difficulty
+                    }
+        return summary
+    
+    def compute_bbox_area_ratios(self, bins=None, n_bins=None, strategy="quantile"):
+        areas = self.df["bbox_area_norm"].clip(1e-9, 1.0)
+        if bins is not None:
+            bins = np.array(bins)
+        else:
+            if n_bins is None:
+                n_bins = 5
+            if strategy == "quantile":
+                bins = np.quantile(areas, np.linspace(0, 1, n_bins + 1))
+            elif strategy == "equal":
+                bins = np.linspace(0, 1, n_bins +1)
+            elif strategy == "log":
+                min_area = areas[areas > 0].min()
+                bins = np.logspace(np.log10(min_area), 0, n_bins + 1)
+            else:
+                raise ValueError(f"strategy must be 'quantile', 'equal', or 'log' and not {strategy}")
+        labels = [f"[{bins[i]:.4f}, {bins[i+1]:.4f})" for i in range(len(bins)-1)]
+        cat = pd.cut(areas, bins=bins, labels=labels, include_lowest=True)
+        counts = cat.value_counts().sort_index()
+        ratios = (counts / counts.sum()).sort_index()
+        return ratios.to_dict()
+    
+    def compute_area_bins(self, n_bins=5, strategy="quantile"):
+        areas = self.df["bbox_area_norm"].clip(1e-9, 1.0)
+        if strategy == "quantile":
+            bins = np.quantile(areas, np.linspace(0, 1, n_bins + 1))
+        elif strategy == "equal":
+            bins = np.linspace(0, 1, n_bins +1)
+        elif strategy == "log":
+            min_area = areas[areas > 0].min()
+            bins = np.logspace(np.log10(min_area), 0, n_bins + 1)
+        else:
+            raise ValueError(f"strategy must be 'quantile', 'equal', or 'log' and not {strategy}")
+        return bins
+    
+    def assign_area_bins(self, bins, labels):
+        self.df["area_bin"] = pd.cut(self.df["bbox_area_norm"], bins=bins, include_lowest=True)
+        self.df["area_bin_label"] = pd.cut(self.df["bbox_area_norm"], bins=bins, labels=labels, include_lowest=True)
+        return self.df
+    
+    
     
