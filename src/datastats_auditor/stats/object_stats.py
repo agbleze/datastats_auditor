@@ -130,15 +130,16 @@ train_annot_df.groupby("category_name")["image_id"].nunique().sum()
 # %%
 
 class ObjectStats:
-    def __init__(self, ann_df, bins=None, n_bins=5, strategy="quantile"):
-        self.df = ann_df.copy()
+    def __init__(self, coco_ann: Union[pd.DataFrame, str, Path], bins=None, n_bins=5, strategy="quantile"):
+        if isinstance(coco_ann, str):
+            coco_ann = coco_annotation_to_df(coco_ann)
+        self.df = coco_ann.copy()
         self._prepare()
         if not bins:
             bins = self.compute_area_bins(n_bins=n_bins, strategy=strategy)
         self.bins = bins
         self.area_bin_labels = [f"[{bins[i]:.4f}, {bins[i+1]:.4f})" for i in range(len(bins)-1)]
-        self.df = self.assign_area_bins(bins, self.area_bin_labels)
-            
+        self.df = self.assign_area_bins(bins, self.area_bin_labels)           
         
     def _prepare(self):
         self.df.dropna(inplace=True)
@@ -159,9 +160,7 @@ class ObjectStats:
         self.df["center_x_norm"] = self.df["center_x"] / self.df["image_width"]
         self.df["center_y_norm"] = self.df["center_y"] / self.df["image_height"]
         
-        self.df["foreground_ratio"] = self.df["bbox_area"] / (self.df["image_width"] * self.df["image_height"]) 
-        
-               
+        self.df["foreground_ratio"] = self.df["bbox_area"] / (self.df["image_width"] * self.df["image_height"])               
 
     def class_distribution(self):
         counts = self.df["category_name"].value_counts()
@@ -514,22 +513,26 @@ class SplitStats:
                  ):
         self.object_stats = object_stats
         self.image_stats = image_stats
+        self.object_stats_kwargs = object_stats_kwargs or {}
+        self.image_stats_kwargs = image_stats_kwargs or {}
         
-        imagestat_results = ImageStatsResult()
-        for split_nm, split_param in image_stats_kwargs.items():
+        self.imagestat_results = ImageStatsResult()
+        self.objectstat_results = ObjectStatsResult()
+
+    def compute_stats(self): 
+        for split_nm, split_param in self.image_stats_kwargs.items():
             dataset = ImageBatchDataset(**split_param)
             imagestat_results = compute_dataset_stats(dataset)
-            setattr(imagestat_results, split_nm, imagestat_results)
+            setattr(self.imagestat_results, split_nm, imagestat_results)
         
-        objectstat_results = ObjectStatsResult()
-        for split_nm, split_param in object_stats_kwargs.items():
+        for split_nm, split_param in self.object_stats_kwargs.items():
             ann_df = coco_annotation_to_df(split_param["ann_file"])
             objstats = ObjectStats(ann_df=ann_df, **split_param)
             objstats_summary = objstats.summary()
-            setattr(objectstat_results, split_nm, objstats_summary)    
+            setattr(self.objectstat_results, split_nm, objstats_summary)    
         
-        self.object_stats_results = objectstat_results
-        self.image_stats_results = imagestat_results
+        self.object_stats_results = self.objectstat_results
+        self.image_stats_results = self.imagestat_results
         
         
         
