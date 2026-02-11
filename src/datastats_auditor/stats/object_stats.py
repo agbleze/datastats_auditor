@@ -533,6 +533,11 @@ class SplitStats:
         
         self.object_stats_results = self.objectstat_results
         self.image_stats_results = self.imagestat_results
+        split_stats = {"image_stats": self.image_stats_results,
+                       "object_stats": self.object_stats_results
+                       }
+        return split_stats
+        
         
         
         
