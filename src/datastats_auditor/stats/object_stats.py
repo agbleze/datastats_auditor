@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from typing import Dict, Union, List, Optional
 from datastats_auditor.src.datastats_auditor.stats.image_stats import ImageBatchDataset
 from datastats_auditor.stats.image_stats import compute_dataset_stats, estimate_image_memory_size_GB, get_memory_info
+from itertools import combinations
 
 #%%
 def coco_annotation_to_df(coco_annotation_file):
@@ -540,21 +541,45 @@ class SplitStats:
             imagestat_results = compute_dataset_stats(dataset)
             setattr(self.imagestat_results, split_nm, imagestat_results)
 
-        split_df_collection = {}
+        self.split_df_collection = {}
         for split_nm, split_param in self.object_stats_kwargs.items():
             ann_df = coco_annotation_to_df(split_param["ann_file"])
             objstats = ObjectStats(ann_df=ann_df, **split_param)
             objstats_summary = objstats.summary()
             setattr(self.objectstat_results, split_nm, objstats_summary)
-            split_df_collection[split_nm] = objstats.df    
+            self.split_df_collection[split_nm] = objstats.df    
         
         self.object_stats_results = self.objectstat_results
         self.image_stats_results = self.imagestat_results
         self.split_stats = {"image_stats": self.image_stats_results,
-                            "object_stats": self.object_stats_results
+                            "object_stats": self.object_stats_results,
+                            "split_dfs": self.split_df_collection
                             }
         return self.split_stats
+    
+    def compute_drift(self, field_names = ["area_bin_label"]):
+        if not hasattr(self, "split_stats"):
+            self.split_stats = self.compute_stats()
+            split_dfs = self.split_stats["split_dfs"]
+        else:
+            split_dfs = self.split_stats["split_dfs"]
         
+        self.drift_results = {}
+        split_pairs = list(combinations(split_dfs.keys(), 2))  
+        
+        for pair in split_pairs:
+            s1, s2 = pair
+            df1, df2 = split_dfs[s1], split_dfs[s2]
+            for field_name in field_names:
+                labels = sorted(set([df[field_name].dropna().unique() for nm, df in split_dfs.items()])) 
+                kl = kl_divergence_between_distributions(df1, df2, field_name=field_name, labels=labels)
+                js = js_divergence_between_distributions(df1, df2, field_name=field_name, labels=labels)
+                self.drift_results[pair] = {"kl_divergence": kl, 
+                                        "js_divergence": js,
+                                        "metric": field_name
+                                        }
+        
+        return self.drift_results
         
         
 
@@ -610,7 +635,6 @@ def compute_js_divergence_per_object(df1, df2, field_name, labels,
         js = js_divergence(p, q)
         results[cls] = js
     return results
-
 
 
 
