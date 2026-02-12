@@ -435,8 +435,10 @@ class ObjectStats:
                     }
         return summary
     
-    def compute_bbox_area_ratios(self, bins=None, n_bins=None, strategy="quantile"):
-        areas = self.df["bbox_area_norm"].clip(1e-9, 1.0)
+    def compute_bbox_area_ratios(self, bins=None, n_bins=None, 
+                                 field_name="bbox_area_norm", 
+                                 strategy="quantile"):
+        areas = self.df[field_name].clip(1e-9, 1.0)
         if bins is not None:
             bins = np.array(bins)
         else:
@@ -457,8 +459,10 @@ class ObjectStats:
         ratios = (counts / counts.sum()).sort_index()
         return ratios.to_dict()
     
-    def compute_area_bins(self, n_bins=5, strategy="quantile"):
-        areas = self.df["bbox_area_norm"].clip(1e-9, 1.0)
+    def compute_area_bins(self, n_bins=5, field_name="bbox_area_norm", 
+                          strategy="quantile"
+                          ):
+        areas = self.df[field_name].clip(1e-9, 1.0)
         if strategy == "quantile":
             bins = np.quantile(areas, np.linspace(0, 1, n_bins + 1))
         elif strategy == "equal":
@@ -470,9 +474,13 @@ class ObjectStats:
             raise ValueError(f"strategy must be 'quantile', 'equal', or 'log' and not {strategy}")
         return bins
     
-    def assign_area_bins(self, bins, labels):
-        self.df["area_bin"] = pd.cut(self.df["bbox_area_norm"], bins=bins, include_lowest=True)
-        self.df["area_bin_label"] = pd.cut(self.df["bbox_area_norm"], bins=bins, labels=labels, include_lowest=True)
+    def assign_area_bins(self, bins, labels, 
+                         field_to_bin="bbox_area_norm",
+                         name_bin_field_as="area_bin", 
+                         name_bin_field_label_as="area_bin_label"
+                         ):
+        self.df[name_bin_field_as] = pd.cut(self.df[field_to_bin], bins=bins, include_lowest=True)
+        self.df[name_bin_field_label_as] = pd.cut(self.df[field_to_bin], bins=bins, labels=labels, include_lowest=True)
         return self.df
     
     
@@ -482,7 +490,14 @@ ann_df = coco_annotation_to_df(train_annfile)
 objstats = ObjectStats(ann_df=ann_df, n_bins=5, strategy="equal")
 
 
+#%%
 
+df = objstats.df
+
+
+#%%
+
+df.area_bin_label
 # %%
 summary = objstats.summary()
 # %%
@@ -524,20 +539,79 @@ class SplitStats:
             dataset = ImageBatchDataset(**split_param)
             imagestat_results = compute_dataset_stats(dataset)
             setattr(self.imagestat_results, split_nm, imagestat_results)
-        
+
+        split_df_collection = {}
         for split_nm, split_param in self.object_stats_kwargs.items():
             ann_df = coco_annotation_to_df(split_param["ann_file"])
             objstats = ObjectStats(ann_df=ann_df, **split_param)
             objstats_summary = objstats.summary()
-            setattr(self.objectstat_results, split_nm, objstats_summary)    
+            setattr(self.objectstat_results, split_nm, objstats_summary)
+            split_df_collection[split_nm] = objstats.df    
         
         self.object_stats_results = self.objectstat_results
         self.image_stats_results = self.imagestat_results
         self.split_stats = {"image_stats": self.image_stats_results,
-                       "object_stats": self.object_stats_results
-                       }
+                            "object_stats": self.object_stats_results
+                            }
         return self.split_stats
         
         
         
-        
+
+def kl_divergence(p, q, eps=1e-12):
+    p = np.asarray(p, dtype=float) + eps
+    q = np.asarray(q, dtype=float) + eps
+    p /= p.sum()
+    q /= q.sum()
+    res = np.sum(p * np.log(p / q))  
+    return res
+
+
+def kl_divergence_between_distributions(df1, df2, field_name, labels):
+    p = df1[field_name].value_counts(normalize=True).reindex(labels, fill_value=0)
+    q = df2[field_name].value_counts(normalize=True).reindex(labels, fill_value=0)
+    kl = kl_divergence(p, q)
+    return kl
+
+
+def js_divergence(p, q, eps=1e-12):
+    p = np.asarray(p, dytpe=float) + eps
+    q = np.asarray(q, dtype=float) + eps
+    p /= p.sum()
+    q /= q.sum()
+    m = 0.5 * (p + q)
+    kl_pm = kl_divergence(p, m)
+    kl_qm = kl_divergence(q, m)
+    #js = 0.5 * (kl_pm + kl_qm)
+    js = 0.5 * kl_pm + 0.5 * kl_qm
+    return js
+
+def js_divergence_between_distributions(df1, df2, field_name, labels):
+    p = df1[field_name].value_counts(normalize=True).reindex(labels, fill_value=0).sort_index()
+    q = df2[field_name].value_counts(normalize=True).reindex(labels, fill_value=0).sorted_index()
+    js = js_divergence(p, q)
+    return js
+
+
+def compute_js_divergence_per_object(df1, df2, field_name, labels,
+                                     category_field="category_name"
+                                     ):
+    classes = sorted(set(df1[category_field]) | set(df2[category_field]))
+    results = {}
+    for cls in classes:
+        p = (df1[df1[category_field] == cls][field_name]
+             .value_counts(normalize=True)
+             .reindex(labels, fill_value=0).sort_index()
+             )
+        q = (df2[df2[category_field] == cls][field_name]
+             .value_counts(normalize=True)
+             .reindex(labels, fill_value=0).sort_index()
+             )
+        js = js_divergence(p, q)
+        results[cls] = js
+    return results
+
+
+
+
+
