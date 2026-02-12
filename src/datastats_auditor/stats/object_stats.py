@@ -11,7 +11,7 @@ import pandas as pd
 from pandas import json_normalize
 import json
 from dataclasses import dataclass
-from typings import Dict, Union, List, Optional
+from typing import Dict, Union, List, Optional
 from datastats_auditor.src.datastats_auditor.stats.image_stats import ImageBatchDataset
 from datastats_auditor.stats.image_stats import compute_dataset_stats, estimate_image_memory_size_GB, get_memory_info
 
