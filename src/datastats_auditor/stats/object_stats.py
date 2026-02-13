@@ -162,7 +162,9 @@ class ObjectStats:
         self.df["center_y_norm"] = self.df["center_y"] / self.df["image_height"]
         
         self.df["foreground_ratio"] = self.df["bbox_area"] / (self.df["image_width"] * self.df["image_height"])               
-
+        self.df["image_area"] = self.df["image_width"] * self.df["image_height"]
+        self.df["occupancy_per_image"] = self.df.groupby("image_id")["bbox_area"].transform("sum") / self.df["image_area"]
+        
     def class_distribution(self):
         counts = self.df["category_name"].value_counts()
         ratios = self.df["category_name"].value_counts(normalize=True).to_dict()
@@ -388,6 +390,19 @@ class ObjectStats:
         bbox_area_bins_ratio = self.df["area_bin_label"].value_counts(normalize=True).to_dict()
         object_bbox_area_per_bins = self.df.groupby(["area_bin_label", "category_name"]).size().unstack(fill_value=0)
         
+        occupancy_per_image_mean = self.df["occupancy_per_image"].mean()
+        occupancy_per_image_min = self.df["occupancy_per_image"].min()
+        occupancy_per_image_max = self.df["occupancy_per_image"].max()
+        occupancy_per_image_median = self.df["occupancy_per_image"].median()
+        occupancy_per_image_std = self.df["occupancy_per_image"].std()
+        
+        scene_stats = {"occupancy_per_image": {"mean": occupancy_per_image_mean,
+                                                "min": occupancy_per_image_min,
+                                                "max": occupancy_per_image_max,
+                                                "median": occupancy_per_image_median,
+                                                "std": occupancy_per_image_std
+                                                }
+                        }
         bbox_stats = {"objects_in_image": {"mean": avg_objects,
                                             "min": min_object_per_image,
                                             "max": max_object_per_image,
@@ -417,7 +432,10 @@ class ObjectStats:
                         "bbox_area_ratio_per_bin": object_bbox_area_per_bins.to_dict()
                         }
         
-        self.difficulty_metrics ={"bbox_stats": bbox_stats, "object_stats": object_stats}
+        self.difficulty_metrics ={"bbox_stats": bbox_stats, 
+                                  "object_stats": object_stats,
+                                  "scene_stats": scene_stats
+                                  }
         
         return self.difficulty_metrics
     
