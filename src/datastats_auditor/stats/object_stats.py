@@ -46,7 +46,9 @@ def coco_annotation_to_df(coco_annotation_file):
 
 #%%    
 
-train_annfile = "/home/lin/codebase/chili_seg/Chili_seg.v3i.coco-segmentation/train/_annotations.coco.json"
+train_annfile = "/home/lin/codebase/tomato_disease_prediction/Tomato-pest&diseases-1/train/_annotations.coco.json"
+val_annfile = "/home/lin/codebase/tomato_disease_prediction/Tomato-pest&diseases-1/valid/_annotations.coco.json"
+test_annfile = "/home/lin/codebase/tomato_disease_prediction/Tomato-pest&diseases-1/test/_annotations.coco.json"
 
 train_annot_df = coco_annotation_to_df(train_annfile)
 
@@ -137,10 +139,10 @@ class ObjectStats:
         self.df = coco_ann.copy()
         self._prepare()
         if not bins:
-            bins = self.compute_area_bins(n_bins=n_bins, strategy=strategy)
+            bins = self.compute_bins(n_bins=n_bins, strategy=strategy)
         self.bins = bins
         self.area_bin_labels = [f"[{bins[i]:.4f}, {bins[i+1]:.4f})" for i in range(len(bins)-1)]
-        self.df = self.assign_area_bins(bins, self.area_bin_labels)           
+        self.df = self.assign_bins(bins, self.area_bin_labels)           
         
     def _prepare(self):
         self.df.dropna(inplace=True)
@@ -457,7 +459,7 @@ class ObjectStats:
     def compute_bbox_area_ratios(self, bins=None, n_bins=None, 
                                  field_name="bbox_area_norm", 
                                  strategy="quantile"):
-        areas = self.df[field_name].clip(1e-9, 1.0)
+        areas = self.df[field_name]#.clip(1e-9, 1.0)
         if bins is not None:
             bins = np.array(bins)
         else:
@@ -478,11 +480,11 @@ class ObjectStats:
         ratios = (counts / counts.sum()).sort_index()
         return ratios.to_dict()
     
-    def compute_area_bins(self, n_bins=5, field_name="bbox_area_norm", 
+    def compute_bins(self, n_bins=5, field_name="bbox_area_norm", 
                           strategy="quantile",
-                          include_overflow_bin=False
+                          include_overflow_bin=True
                           ):
-        areas = self.df[field_name].clip(1e-9, 1.0)
+        areas = self.df[field_name]#.clip(1e-9, 1.0)
         max_area = areas.max()
         min_area = areas.min()
         if strategy == "quantile":
@@ -498,7 +500,7 @@ class ObjectStats:
             bins = np.concatenate(([-np.inf], bins, [np.inf]))
         return bins
     
-    def assign_area_bins(self, bins, labels, 
+    def assign_bins(self, bins, labels, 
                          field_to_bin="bbox_area_norm",
                          name_bin_field_as="area_bin", 
                          name_bin_field_label_as="area_bin_label"
@@ -511,19 +513,24 @@ class ObjectStats:
     
 # %%
 #ann_df = coco_annotation_to_df(train_annfile)
-train_objstats = ObjectStats(coco_ann=train_annfile, n_bins=5, strategy="equal")
+train_objstats = ObjectStats(coco_ann=train_annfile, n_bins=5, strategy="quantile")
+val_objstats = ObjectStats(coco_ann=val_annfile, n_bins=5, strategy="quantile")
+test_objstats = ObjectStats(coco_ann=test_annfile, n_bins=5, strategy="quantile")
 
 
 #%%
 
 train_df = train_objstats.df
-
+val_df = val_objstats.df
+test_df = test_objstats.df
 
 #%%
 
 train_df.area_bin_label
 # %%
 train_summary = train_objstats.summary()
+val_summary = val_objstats.summary()
+test_summary = test_objstats.summary()
 # %%
 train_summary
 
@@ -674,7 +681,7 @@ def compute_js_divergence_per_object(df1, df2, field_name, labels,
 
 #%%
 
-areas = train_df["bbox_area_norm"].clip(1e-9, 1.0)
+areas = train_df["bbox_area_norm"]#.clip(1e-9, 1.0)
 
 #%%
 
@@ -715,3 +722,11 @@ pd.cut(data_b, bins=eq_bins, include_lowest=True)
 
 np.logspace(np.log10(np.min(data_a)), np.log10(np.max(data_a)), 5 + 1)
 # %%
+
+val_df["area_bin_label"].isna().sum()
+
+# %%
+
+js_divergence_between_distributions(train_df, val_df, field_name="area_bin_label", 
+                                    labels=train_objstats.area_bin_labels)
+
