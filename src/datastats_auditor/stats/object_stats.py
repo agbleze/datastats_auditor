@@ -12,7 +12,7 @@ from pandas import json_normalize
 import json
 from dataclasses import dataclass
 from typing import Dict, Union, List, Optional
-from datastats_auditor.src.datastats_auditor.stats.image_stats import ImageBatchDataset
+from datastats_auditor.stats.image_stats import ImageBatchDataset
 from datastats_auditor.stats.image_stats import compute_dataset_stats, estimate_image_memory_size_GB, get_memory_info
 from itertools import combinations
 
@@ -479,18 +479,23 @@ class ObjectStats:
         return ratios.to_dict()
     
     def compute_area_bins(self, n_bins=5, field_name="bbox_area_norm", 
-                          strategy="quantile"
+                          strategy="quantile",
+                          include_overflow_bin=False
                           ):
         areas = self.df[field_name].clip(1e-9, 1.0)
+        max_area = areas.max()
+        min_area = areas.min()
         if strategy == "quantile":
             bins = np.quantile(areas, np.linspace(0, 1, n_bins + 1))
         elif strategy == "equal":
-            bins = np.linspace(0, 1, n_bins +1)
+            bins = np.linspace(min_area, max_area, n_bins +1)
         elif strategy == "log":
-            min_area = areas[areas > 0].min()
-            bins = np.logspace(np.log10(min_area), 0, n_bins + 1)
+            min_area = areas[areas > 0].min()            
+            bins = np.logspace(np.log10(min_area), np.log10(max_area), n_bins + 1)
         else:
             raise ValueError(f"strategy must be 'quantile', 'equal', or 'log' and not {strategy}")
+        if include_overflow_bin:
+            bins = np.concatenate(([-np.inf], bins, [np.inf]))
         return bins
     
     def assign_area_bins(self, bins, labels, 
@@ -505,22 +510,34 @@ class ObjectStats:
     
     
 # %%
-ann_df = coco_annotation_to_df(train_annfile)
-objstats = ObjectStats(ann_df=ann_df, n_bins=5, strategy="equal")
+#ann_df = coco_annotation_to_df(train_annfile)
+train_objstats = ObjectStats(coco_ann=train_annfile, n_bins=5, strategy="equal")
 
 
 #%%
 
-df = objstats.df
+train_df = train_objstats.df
 
 
 #%%
 
-df.area_bin_label
+train_df.area_bin_label
 # %%
-summary = objstats.summary()
+train_summary = train_objstats.summary()
 # %%
-summary
+train_summary
+
+#%%
+
+train_df.area_bin.isna().sum()
+
+#%%
+
+train_df[train_df["foreground_ratio"] > 1]
+
+#%%
+
+train_summary["difficulty"]["bbox_stats"]["bbox_area_ratio_per_bin"]
 # %%
 
 @dataclass
@@ -655,5 +672,46 @@ def compute_js_divergence_per_object(df1, df2, field_name, labels,
     return results
 
 
+#%%
+
+areas = train_df["bbox_area_norm"].clip(1e-9, 1.0)
+
+#%%
+
+areas
+
+bins = np.quantile(areas, np.linspace(0, 1, 5 + 1))
+# %%
+min_area = areas[areas > 0].min()
+bins = np.logspace(np.log10(min_area), 0, 5 + 1)
+
+bins = np.linspace(0, 1, 5 +1)
+#%%
+
+for i in bins:
+    print(f"{i:.6f}")
+    break
 
 
+# %%
+pd.cut(areas, bins=bins, include_lowest=True)#.value_counts().sort_index()
+# %%
+data_a = [i for i in np.arange(1, 100, 2)]
+# %%
+data_b = [i for i in np.arange(51, 150, 2)]
+# %%
+bins_exp = np.quantile(data_a, np.linspace(0, 1, 5 + 1))
+# %%
+pd.cut(data_a, bins=bins_exp, include_lowest=True)
+# %%
+pd.cut(data_b, bins=bins_exp, include_lowest=True)
+# %%
+eq_bins = np.linspace(np.min(data_a), np.max(data_a), 5 +1)
+eq_bins = np.concatenate(([-np.inf], eq_bins, [np.inf]))
+
+pd.cut(data_b, bins=eq_bins, include_lowest=True)
+# %%
+#bins = 
+
+np.logspace(np.log10(np.min(data_a)), np.log10(np.max(data_a)), 5 + 1)
+# %%
