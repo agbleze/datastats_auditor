@@ -153,9 +153,9 @@ class ObjectStats:
         self.df["bbox_y"] = self.df["bbox"].apply(lambda b: b[1])
         self.df["bbox_w"] = self.df["bbox"].apply(lambda b: b[2])
         self.df["bbox_h"] = self.df["bbox"].apply(lambda b: b[3])
-
+        self.df["image_area"] = self.df["image_width"] * self.df["image_height"]
         self.df["bbox_area"] = self.df["bbox_w"] * self.df["bbox_h"]
-        self.df["bbox_area_norm"] = self.df["bbox_area"] / (self.df["image_width"] * self.df["image_height"])
+        self.df["bbox_area_norm"] = self.df["bbox_area"] / self.df["image_area"]
         self.df["bbox_aspect_ratio"] = self.df["bbox_w"] / self.df["bbox_h"]
 
         # compute object center coordinates
@@ -166,8 +166,7 @@ class ObjectStats:
         self.df["center_x_norm"] = self.df["center_x"] / self.df["image_width"]
         self.df["center_y_norm"] = self.df["center_y"] / self.df["image_height"]
         
-        self.df["foreground_ratio"] = self.df["bbox_area"] / (self.df["image_width"] * self.df["image_height"])               
-        self.df["image_area"] = self.df["image_width"] * self.df["image_height"]
+        self.df["foreground_ratio"] = self.df["bbox_area"] / self.df["image_area"]               
         self.df["occupancy_per_image"] = self.df.groupby("image_id")["bbox_area"].transform("sum") / self.df["image_area"]
         
     def class_distribution(self):
@@ -1016,7 +1015,7 @@ class DomainShiftScore:
 #%%
 
 class DriftMetricSuite:
-    def __init_(self, distributions: Dict[str, pd.DataFrame],
+    def __init__(self, distributions: Dict[str, pd.DataFrame],
                 metrics: Union[str, List[str]],
                 field_to_bin: Union[str, List[str]],
                 **kwargs
@@ -1064,13 +1063,40 @@ class DriftMetricSuite:
                                             metric=metric
                                             )     
                     drift_res = drift_cls.compute_drift()  
-                    self.drift_results[pair] = {metric: drift_res,
-                                                "property": field
-                                                }  
+                    self.drift_results[f"{pair}_{field}_{metric}"] = {metric: drift_res,
+                                                                    "distribution_pair": pair,
+                                                                    "property": field
+                                                                    }  
                     
         return self.drift_results
             
+#%%
+train_df.columns
 
+distributions = {"train": train_df,
+                 "val": val_df,
+                 "test": test_df
+                 }
+
+metrics = ["kl", "js"]
+
+field_to_bin = ['bbox_area_norm', 'bbox_aspect_ratio',
+                'foreground_ratio', 'occupancy_per_image'
+                ]
+
+#%%
+
+drift_suite_cls = DriftMetricSuite(distributions=distributions,
+                                    metrics=metrics, field_to_bin=field_to_bin
+                                    )
+
+
+#%%
+drift_results = drift_suite_cls.drift_metrics()
+
+#%%
+
+drift_results
 
 # %%
 
