@@ -17,6 +17,9 @@ from datastats_auditor.stats.image_stats import compute_dataset_stats, estimate_
 from itertools import combinations
 
 #%%
+
+VALID_BINNING_STRATEGY = ["quantile", "equal", "log"]
+
 def coco_annotation_to_df(coco_annotation_file):
     with open(coco_annotation_file, "r") as annot_file:
         annotation = json.load(annot_file)
@@ -563,38 +566,47 @@ class ObjectStatsResult:
     
     
 class SplitStats:
-    def __init__(self, object_stats: ObjectStats,
-                 image_stats: ImageBatchDataset,
+    def __init__(self, object_stats_cls: ObjectStats,
+                 image_loader_cls: ImageBatchDataset,
                  object_stats_kwargs: Optional[Dict] = None,
                  image_stats_kwargs: Optional[Dict] = None,
                  **kwargs
                  ):
-        self.object_stats = object_stats
-        self.image_stats = image_stats
-        self.object_stats_kwargs = object_stats_kwargs or {}
-        self.image_stats_kwargs = image_stats_kwargs or {}
+        self.object_stats_cls = object_stats_cls
+        self.image_loader_cls = image_loader_cls
+        self.object_stats_kwargs = object_stats_kwargs
+        self.image_stats_kwargs = image_stats_kwargs
+        
+        print(f"self.object_stats_kwargs: {self.object_stats_kwargs}")
+        #os.exit(0)
         
         self.imagestat_results = ImageStatsResult()
         self.objectstat_results = ObjectStatsResult()
 
     def compute_stats(self): 
         for split_nm, split_param in self.image_stats_kwargs.items():
-            dataset = ImageBatchDataset(**split_param)
+            print(f"Computing image stats for {split_nm} split...")
+            dataset = self.image_loader_cls(**split_param)
             imagestat_results = compute_dataset_stats(dataset)
             setattr(self.imagestat_results, split_nm, imagestat_results)
+            print(f"Finished computing image stats for {split_nm} split.")
 
         self.split_df_collection = {}
         for split_nm, split_param in self.object_stats_kwargs.items():
-            ann_df = coco_annotation_to_df(split_param["ann_file"])
-            objstats = ObjectStats(ann_df=ann_df, **split_param)
+            print(f"Computing object stats for {split_nm} split...")
+            #ann_df = coco_annotation_to_df(split_param["ann_file"])
+            objstats = self.object_stats_cls(#coco_ann=split_param["ann_file"], 
+                                             **split_param
+                                             )
             objstats_summary = objstats.summary()
             setattr(self.objectstat_results, split_nm, objstats_summary)
             self.split_df_collection[split_nm] = objstats.df    
+            print(f"Finished computing object stats for {split_nm} split.")
         
-        self.object_stats_results = self.objectstat_results
+        #self.object_stats_results = self.objectstat_results
         self.image_stats_results = self.imagestat_results
         self.split_stats = {"image_stats": self.image_stats_results,
-                            "object_stats": self.object_stats_results,
+                            "object_stats": self.objectstat_results,
                             "split_dfs": self.split_df_collection
                             }
         return self.split_stats
@@ -617,17 +629,17 @@ class SplitStats:
                 kl = kl_divergence_between_distributions(df1, df2, field_name=field_name, labels=labels)
                 js = js_divergence_between_distributions(df1, df2, field_name=field_name, labels=labels)
                 self.drift_results[pair] = {"kl_divergence": kl, 
-                                        "js_divergence": js,
-                                        "metric": field_name
-                                        }
+                                            "js_divergence": js,
+                                            "metric": field_name
+                                            }
         
         return self.drift_results
         
         
 
 def kl_divergence(p, q, eps=1e-12):
-    p = np.asarray(p, dtype=float) + eps
-    q = np.asarray(q, dtype=float) + eps
+    p = np.asarray(p) + eps
+    q = np.asarray(q) + eps
     p /= p.sum()
     q /= q.sum()
     res = np.sum(p * np.log(p / q))  
@@ -642,8 +654,8 @@ def kl_divergence_between_distributions(df1, df2, field_name, labels):
 
 
 def js_divergence(p, q, eps=1e-12):
-    p = np.asarray(p, dytpe=float) + eps
-    q = np.asarray(q, dtype=float) + eps
+    p = np.asarray(p) + eps
+    q = np.asarray(q) + eps
     p /= p.sum()
     q /= q.sum()
     m = 0.5 * (p + q)
@@ -654,8 +666,8 @@ def js_divergence(p, q, eps=1e-12):
     return js
 
 def js_divergence_between_distributions(df1, df2, field_name, labels):
-    p = df1[field_name].value_counts(normalize=True).reindex(labels, fill_value=0).sort_index()
-    q = df2[field_name].value_counts(normalize=True).reindex(labels, fill_value=0).sorted_index()
+    p = df1[field_name].value_counts(normalize=True).reindex(labels, fill_value=0)#.sort_index()
+    q = df2[field_name].value_counts(normalize=True).reindex(labels, fill_value=0)#.sorted_index()
     js = js_divergence(p, q)
     return js
 
@@ -668,11 +680,11 @@ def compute_js_divergence_per_object(df1, df2, field_name, labels,
     for cls in classes:
         p = (df1[df1[category_field] == cls][field_name]
              .value_counts(normalize=True)
-             .reindex(labels, fill_value=0).sort_index()
+             .reindex(labels, fill_value=0)#.sort_index()
              )
         q = (df2[df2[category_field] == cls][field_name]
              .value_counts(normalize=True)
-             .reindex(labels, fill_value=0).sort_index()
+             .reindex(labels, fill_value=0)#.sort_index()
              )
         js = js_divergence(p, q)
         results[cls] = js
@@ -725,6 +737,280 @@ np.logspace(np.log10(np.min(data_a)), np.log10(np.max(data_a)), 5 + 1)
 
 val_df["area_bin_label"].isna().sum()
 
+
+#%%
+
+train_imgdir = "/home/lin/codebase/tomato_disease_prediction/Tomato-pest&diseases-1/train"
+val_imgdir = "/home/lin/codebase/tomato_disease_prediction/Tomato-pest&diseases-1/valid"
+test_imgdir = "/home/lin/codebase/tomato_disease_prediction/Tomato-pest&diseases-1/test"
+
+obj_stats_kwargs = {"train": {"coco_ann": train_annfile, "n_bins": 5, "strategy": "quantile"},
+                    "val": {"coco_ann": val_annfile, "n_bins": 5, "strategy": "quantile"},
+                    "test": {"coco_ann": test_annfile, "n_bins": 5, "strategy": "quantile"}
+                }
+
+image_stats_kwargs = {"train": {"image_dir": train_imgdir},
+                        "val": {"image_dir": val_imgdir},
+                        "test": {"image_dir": test_imgdir}
+                    }
+
+
+#%%
+
+print(f"obj_stats_kwargs: {obj_stats_kwargs}")
+
+#%%
+split_stats_cls = SplitStats(object_stats_cls=ObjectStats,
+                            image_loader_cls=ImageBatchDataset, 
+                            object_stats_kwargs=obj_stats_kwargs,
+                            image_stats_kwargs=image_stats_kwargs
+                            )  
+
+
+
+#%%
+
+split_stats_res = split_stats_cls.compute_stats()
+
+#%%
+
+split_stats_res["image_stats"].val
+
+#%%
+
+split_stats_res["split_dfs"]
+
+#%%
+
+split_stats_res["object_stats"].test
+
+
+#%%
+
+sorted(set([df["area_bin_label"].dropna().values for nm, df in split_stats_res["split_dfs"].items()]))
+
+#%%
+
+[df["area_bin_label"].dropna().values for nm, df in split_stats_res["split_dfs"].items()]
+#%%
+
+split_drift_res = split_stats_cls.compute_drift()
+
+
+#%%
+pd.concat([train_df["bbox_area_norm"], val_df["bbox_area_norm"]])
+
+
+#%%
+
+class DriftStats:
+    def __init__(self, reference_distribution, comparison_distribution,
+                 field_to_bin,
+                 name_bin_field_as, 
+                 name_bin_field_label_as,
+                 bins=None,
+                 **kwargs
+                 ):
+        """
+        
+        kwargs:
+            strategy
+            include_overflow_bin
+            n_bins
+            metric
+        
+        """
+        self.reference_distribution = reference_distribution
+        self.comparison_distribution = comparison_distribution
+        self.bins = bins
+        self.field_to_bin = field_to_bin
+        self.name_bin_field_as = name_bin_field_as
+        self.name_bin_field_label_as = name_bin_field_label_as
+        self.strategy = kwargs.get("strategy", "quantile")
+        self.include_overflow_bin = kwargs.get("include_overflow_bin", False)
+        self.n_bins = kwargs.get("n_bins", 5)
+        self.metric = kwargs.get("metric", "js")
+        
+        if self.strategy not in VALID_BINNING_STRATEGY:
+            raise ValueError(f"strategy {self.strategy} is not valid: Valid strategy should be one {VALID_BINNING_STRATEGY}")
+        
+    
+    
+    def compute_bins(self, n_bins=None, field_to_bin=None, 
+                    strategy=None,
+                    ):
+        if strategy is None:
+            strategy = self.strategy
+            
+        if field_to_bin is None:
+            field_to_bin = self.field_to_bin
+        if n_bins is None:
+            n_bins = self.n_bins
+        #areas = self.df[field_name]#.clip(1e-9, 1.0)
+        values = pd.concat([self.reference_distribution[field_to_bin], self.comparison_distribution[field_to_bin]])
+        max_value = values.max()
+        min_value = values.min()
+        if strategy == "quantile":
+            bins = np.quantile(values, np.linspace(0, 1, n_bins + 1))
+        elif strategy == "equal":
+            bins = np.linspace(min_value, max_value, n_bins +1)
+        elif strategy == "log":
+            min_value = values[values > 0].min()            
+            bins = np.logspace(np.log10(min_value), np.log10(max_value), n_bins + 1)
+        else:
+            raise ValueError(f"strategy must be 'quantile', 'equal', or 'log' and not {strategy}")
+        if self.include_overflow_bin:
+            bins = np.concatenate(([-np.inf], bins, [np.inf]))
+        return bins
+    
+    def assign_bins(self, distribution,
+                    bins, labels, 
+                    field_to_bin=None,
+                    name_bin_field_as=None, 
+                    name_bin_field_label_as=None
+                    ):
+        if field_to_bin is None:
+            field_to_bin = self.field_to_bin
+        if name_bin_field_as is None:
+            name_bin_field_as = self.name_bin_field_as
+        if name_bin_field_label_as is None:
+            name_bin_field_label_as = self.name_bin_field_label_as
+            
+        distribution[name_bin_field_as] = pd.cut(distribution[field_to_bin], bins=bins, include_lowest=True)
+        distribution[name_bin_field_label_as] = pd.cut(distribution[field_to_bin], bins=bins, labels=labels, include_lowest=True)
+        return distribution
+    
+    def compute_drift(self, metric="js"):
+        if self.bins is not None:
+            bins = self.bins
+        else:
+            bins = self.compute_bins()
+        labels = [f"[{bins[i]:.4f}, {bins[i+1]:.4f})" for i in range(len(bins)-1)]
+        self.reference_distribution = self.assign_bins(distribution=self.reference_distribution,
+                                                        bins=bins, labels=labels
+                                                        )
+        self.comparison_distribution = self.assign_bins(distribution=self.comparison_distribution,
+                                                        bins=bins, labels=labels
+                                                        )
+        
+        if metric is None:
+            metric = self.metric
+            
+        if metric == "js":
+            divergence_res = js_divergence_between_distributions(df1=self.reference_distribution,
+                                                                df2=self.comparison_distribution,
+                                                                labels=labels,
+                                                                field_name=self.name_bin_field_label_as
+                                                                )
+        if metric == "kl":
+            divergence_res = kl_divergence_between_distributions(df1=self.reference_distribution,
+                                                                 df2=self.comparison_distribution,
+                                                                 labels=labels,
+                                                                 field_name=self.name_bin_field_label_as
+                                                                 )
+            
+        return divergence_res
+
+#%%
+
+train_df.columns 
+
+val_df.columns   
+#%%
+
+
+drift_cls = DriftStats(reference_distribution=train_df,
+                       comparison_distribution=val_df,
+                       field_to_bin="bbox_area_norm",
+                       name_bin_field_as="bbox_area_bin",
+                       name_bin_field_label_as="bbox_area_bin_label"
+                       )
+
+
+#%%
+
+train_val_drift = drift_cls.compute_drift()
+
+
+#%%
+
+train_val_drift
+
+#%%
+
+train_refdf = drift_cls.reference_distribution
+
+train_refdf.groupby("bbox_area_bin_label").size()
+
+#%%
+val_compdf = drift_cls.comparison_distribution
+val_compdf.groupby("bbox_area_bin_label").size()
+
+
+#%%
+
+train_test_drift_cls = DriftStats(reference_distribution=train_df,
+                                 comparison_distribution=test_df,
+                                 field_to_bin="bbox_area_norm",
+                                name_bin_field_as="bbox_area_bin",
+                                name_bin_field_label_as="bbox_area_bin_label"
+                                 )
+
+#%%
+
+train_test_drift_res = train_test_drift_cls.compute_drift()
+
+
+train_test_drift_res
+
+#%%
+
+test_compdf = train_test_drift_cls.comparison_distribution
+test_compdf.groupby("bbox_area_bin_label").size()
+
+
+#%%
+
+class DomainShiftScore:
+    def __init__(self, drift_scores: dict,
+                 weights: dict,
+                 normalize_drift_scores,
+                 **kwargs
+                 ):
+        self.drift_scores = drift_scores
+        self.weights = weights
+        self.normalize = normalize_drift_scores
+        
+        if self.weights is None:
+            total_num_drifts = len(self.drift_scores)
+            self.weights = {k: 1.0/total_num_drifts for k in self.drift_scores.keys()}
+            
+        if normalize_drift_scores:
+            max_value = max(self.drift_scores.values())
+            self.norm_drift_scores = {k: v/max_value for k,v in self.drift_scores.items()}
+        else:
+            self.norm_drift_scores = drift_scores
+            
+    def compute_composite_score(self):
+        self.composite_score =  sum(self.norm_drift_scores[k]*self.weights[k] 
+                                    for k in self.norm_drift_scores
+                                    )
+        return self.composite_score
+    
+    def get_max_drift(self):
+        return max(self.norm_drift_scores.values())
+    
+    def ranked(self):
+        return sorted(self.norm_scores.items(), key=lambda x: x[1], reverse=True) 
+    
+    def explain(self): 
+        lines = ["Domain Shift Breakdown:"] 
+        for k, v in self.ranked(): 
+            lines.append(f" - {k}: {v:.4f}") 
+        lines.append(f"\nComposite Score: {self.composite():.4f}") 
+        lines.append(f"Max Score: {self.max():.4f}") 
+        return "\n".join(lines)
+    
 # %%
 
 js_divergence_between_distributions(train_df, val_df, field_name="area_bin_label", 
