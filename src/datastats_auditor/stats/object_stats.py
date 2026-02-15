@@ -1010,7 +1010,68 @@ class DomainShiftScore:
         lines.append(f"\nComposite Score: {self.composite():.4f}") 
         lines.append(f"Max Score: {self.max():.4f}") 
         return "\n".join(lines)
-    
+ 
+ 
+ 
+#%%
+
+class DriftMetricSuite:
+    def __init_(self, distributions: Dict[str, pd.DataFrame],
+                metrics: Union[str, List[str]],
+                field_to_bin: Union[str, List[str]],
+                **kwargs
+                ):
+        
+        self.distributions = distributions
+        self.metrics = metrics
+        self.distribution_pairs = list(combinations(distributions.keys(), 2))
+        self.strategy = kwargs.get("strategy", "quantile")
+        self.n_bins = kwargs.get("n_bins", 5)
+        self.bins = kwargs.get("bins")
+        self.include_overflow_bin = kwargs.get("include_overflow_bin", False)
+        
+        for i in [field_to_bin, metrics]:
+            if not isinstance(i, (str, list)):
+                raise TypeError(f"{i} needs to be of type str or list and not {type(i)}")
+        
+        if isinstance(field_to_bin, str):
+            self.field_to_bin = [field_to_bin]
+        else:
+            self.field_to_bin = field_to_bin
+        if isinstance(metrics, str):
+            self.metrics = [metrics]
+        else:
+            self.metrics = metrics
+            
+    def drift_metrics(self):
+        self.drift_results = {}
+        for pair in self.distribution_pairs:
+            ref, comp = pair
+            ref_df = self.distributions[ref]
+            comp_df = self.distributions[comp]
+            
+            for field in self.field_to_bin:
+                name_bin_field_as = f"{field}_bin"
+                name_bin_field_label_as = f"{name_bin_field_as}_label"
+                for metric in self.metrics:
+                    drift_cls = DriftStats(reference_distribution=ref_df,
+                                            comparison_distribution=comp_df,
+                                            field_to_bin=field,
+                                            name_bin_field_as=name_bin_field_as,
+                                            name_bin_field_label_as=name_bin_field_label_as,
+                                            bins=self.bins, n_bins=self.n_bins,
+                                            strategy=self.strategy,
+                                            metric=metric
+                                            )     
+                    drift_res = drift_cls.compute_drift()  
+                    self.drift_results[pair] = {metric: drift_res,
+                                                "property": field
+                                                }  
+                    
+        return self.drift_results
+            
+
+
 # %%
 
 js_divergence_between_distributions(train_df, val_df, field_name="area_bin_label", 
