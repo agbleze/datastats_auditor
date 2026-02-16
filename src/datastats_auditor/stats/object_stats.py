@@ -166,8 +166,10 @@ class ObjectStats:
         self.df["center_x_norm"] = self.df["center_x"] / self.df["image_width"]
         self.df["center_y_norm"] = self.df["center_y"] / self.df["image_height"]
         
-        self.df["foreground_ratio"] = self.df["bbox_area"] / self.df["image_area"]               
-        self.df["occupancy_per_image"] = self.df.groupby("image_id")["bbox_area"].transform("sum") / self.df["image_area"]
+        #self.df["foreground_ratio"] = self.df["bbox_area"] / self.df["image_area"]               
+        #self.df["occupancy_per_image"] = self.df.groupby("image_id")["bbox_area"].transform("sum") / self.df["image_area"]
+        self.df = compute_foreground_area_union(self.df)
+        self.df["foreground_ratio"] = self.df["foreground"] / self.df["imagea_area"]
         
     def class_distribution(self):
         counts = self.df["category_name"].value_counts()
@@ -394,19 +396,19 @@ class ObjectStats:
         bbox_area_bins_ratio = self.df["area_bin_label"].value_counts(normalize=True).to_dict()
         object_bbox_area_per_bins = self.df.groupby(["area_bin_label", "category_name"]).size().unstack(fill_value=0)
         
-        occupancy_per_image_mean = self.df["occupancy_per_image"].mean()
-        occupancy_per_image_min = self.df["occupancy_per_image"].min()
-        occupancy_per_image_max = self.df["occupancy_per_image"].max()
-        occupancy_per_image_median = self.df["occupancy_per_image"].median()
-        occupancy_per_image_std = self.df["occupancy_per_image"].std()
+        # occupancy_per_image_mean = self.df["occupancy_per_image"].mean()
+        # occupancy_per_image_min = self.df["occupancy_per_image"].min()
+        # occupancy_per_image_max = self.df["occupancy_per_image"].max()
+        # occupancy_per_image_median = self.df["occupancy_per_image"].median()
+        # occupancy_per_image_std = self.df["occupancy_per_image"].std()
         
-        scene_stats = {"occupancy_per_image": {"mean": occupancy_per_image_mean,
-                                                "min": occupancy_per_image_min,
-                                                "max": occupancy_per_image_max,
-                                                "median": occupancy_per_image_median,
-                                                "std": occupancy_per_image_std
-                                                }
-                        }
+        # scene_stats = {"occupancy_per_image": {"mean": occupancy_per_image_mean,
+        #                                         "min": occupancy_per_image_min,
+        #                                         "max": occupancy_per_image_max,
+        #                                         "median": occupancy_per_image_median,
+        #                                         "std": occupancy_per_image_std
+        #                                         }
+        #                 }
         bbox_stats = {"objects_in_image": {"mean": avg_objects,
                                             "min": min_object_per_image,
                                             "max": max_object_per_image,
@@ -1097,6 +1099,86 @@ drift_results = drift_suite_cls.drift_metrics()
 #%%
 
 drift_results
+
+
+#%%
+
+for _, row in train_df.groupby("image_id").iterrows():
+    print(row)
+    break    
+
+
+#%%
+
+from shapely.geometry import box
+from shapely.ops import unary_union
+
+def compute_foreground_ratio_union(df):
+    def per_image_union(group):
+        polys = []
+        for _, row in group.iterrows():
+            x_min = row["bbox_x"]
+            y_min = row["bbox_y"]
+            x_max = row["bbox_x"] + row["bbox_w"]
+            y_max = row["bbox_y"] + row["bbox_h"]
+            polys.append(box(x_min, y_min, x_max, y_max))
+
+        if not polys:
+            return 0.0
+
+        union_poly = unary_union(polys)
+        img_area = group["image_width"].iloc[0] * group["image_height"].iloc[0]
+        return union_poly.area / img_area
+
+    ratios = (
+        df.groupby("image_id")
+          .apply(per_image_union)
+          .rename("foreground_ratio_union")
+          .reset_index()
+    )
+
+    return df.merge(ratios, on="image_id")
+
+
+    
+def compute_foreground_area_union(df):
+    def bbox_area_union(group):
+        polys = []
+        for _, row in group.iterrows():
+            x_min = row["bbox_x"]
+            y_min = row["bbox_y"]
+            x_max = row["bbox_x"] + row["bbox_w"]
+            y_max = row["bbox_y"] + row["bbox_h"]
+            polys.append(box(x_min, y_min, x_max, y_max))
+
+        if not polys:
+            return 0.0
+
+        union_poly = unary_union(polys)
+        return union_poly.area 
+    ratios = (
+        df.groupby("image_id")
+          .apply(bbox_area_union)
+          .rename("foreground")
+          .reset_index()
+    )
+
+    return df.merge(ratios, on="image_id")
+
+#%%
+
+trn_df = compute_foreground_ratio_union(train_df)
+
+#%%
+
+trn_df[["foreground_ratio_union", "foreground_ratio", "bbox_area_norm",
+        "occupancy_per_image"
+        ]]
+
+#%%
+
+trn_df[trn_df["foreground_ratio_union"] > trn_df["occupancy_per_image"]]
+
 
 # %%
 
