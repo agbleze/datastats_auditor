@@ -155,7 +155,7 @@ class ObjectStats:
         self.df["bbox_h"] = self.df["bbox"].apply(lambda b: b[3])
         self.df["image_area"] = self.df["image_width"] * self.df["image_height"]
         self.df["bbox_area"] = self.df["bbox_w"] * self.df["bbox_h"]
-        self.df["bbox_area_norm"] = self.df["bbox_area"] / self.df["image_area"]
+        self.df["bbox_area_norm"] = self.df["bbox_area"] / self.df["image_area"] # area of each bbox wrt image area
         self.df["bbox_aspect_ratio"] = self.df["bbox_w"] / self.df["bbox_h"]
 
         # compute object center coordinates
@@ -169,7 +169,11 @@ class ObjectStats:
         #self.df["foreground_ratio"] = self.df["bbox_area"] / self.df["image_area"]               
         #self.df["occupancy_per_image"] = self.df.groupby("image_id")["bbox_area"].transform("sum") / self.df["image_area"]
         self.df = compute_foreground_area_union(self.df)
-        self.df["foreground_ratio"] = self.df["foreground"] / self.df["imagea_area"]
+        self.df["occupancy_per_image"] = self.df["foreground_union_area_per_image"] / self.df["imagea_area"]
+        self.df["background_area_per_image"] = self.df["image_area"] - self.df["foreground_union_area_per_image"]
+        self.df["foreground_to_background_area_per_image"] = (self.df["foreground_union_area_per_image"]
+                                                               / self.df["background_area_per_image"]
+                                                               )
         
     def class_distribution(self):
         counts = self.df["category_name"].value_counts()
@@ -1159,7 +1163,7 @@ def compute_foreground_area_union(df):
     ratios = (
         df.groupby("image_id")
           .apply(bbox_area_union)
-          .rename("foreground")
+          .rename("foreground_union_area_per_image")
           .reset_index()
     )
 
