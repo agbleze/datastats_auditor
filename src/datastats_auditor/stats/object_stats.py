@@ -174,7 +174,12 @@ class ObjectStats:
         self.df["foreground_to_background_area_per_image"] = (self.df["foreground_union_area_per_image"]
                                                                / self.df["background_area_per_image"]
                                                                )
-        
+        num_bboxes = self.df.groupby("image_id").size().rename("num_bboxes_per_image").reset_index()
+        self.df = self.df.merge(num_bboxes, on="image_id", how="left")
+        bbox_area_norm_var = self.df.groupby("image_id")["bbox_area_norm"].var().fillna(0)
+        self.df["bbox_area_norm_variance_per_image"] = self.df.merge(bbox_area_norm_var, on="image_id", how="left")
+    
+    
     def class_distribution(self):
         counts = self.df["category_name"].value_counts()
         ratios = self.df["category_name"].value_counts(normalize=True).to_dict()
@@ -1184,6 +1189,49 @@ trn_df[["foreground_ratio_union", "foreground_ratio", "bbox_area_norm",
 trn_df[trn_df["foreground_ratio_union"] > trn_df["occupancy_per_image"]]
 
 
+
+#%%
+
+
+num_bboxes = trn_df.groupby("image_id").size().rename("num_bboxes").reset_index()#["bbox"].count()
+
+td = trn_df.merge(num_bboxes, on="image_id", how="left")
+
+
+#%%
+
+td.columns
+#%%
+
+td["image_id"].max()
+#pd.concat()
+td[td["image_id"]==2100][["image_id","num_bboxes"]]
+#%%
+num_bboxes["image_id"].max()
+num_bboxes[num_bboxes["image_id"]==2100][["image_id","num_bboxes"]]
+
+#%%
+
+trn_df.columns
+
+#%%
+
+td.sort_values(by="image_id")[["image_id", "num_bboxes"]]
+
+#%%
+
+num_bboxes.sort_values(by="image_id")
+#%%
+
+
+#trn_df.drop("num_bboxes", axis=1, inplace=True)
+
+td["bbox_area_norm"].var()
+
+td.groupby("image_id")["bbox_area_norm"].var().fillna(0)
+#%%
+
+trn_df#.columns
 # %%
 
 js_divergence_between_distributions(train_df, val_df, field_name="area_bin_label", 
