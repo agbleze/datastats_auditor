@@ -15,6 +15,9 @@ from typing import Dict, Union, List, Optional
 from datastats_auditor.stats.image_stats import ImageBatchDataset
 from datastats_auditor.stats.image_stats import compute_dataset_stats, estimate_image_memory_size_GB, get_memory_info
 from itertools import combinations
+from shapely.geometry import box
+from shapely.ops import unary_union
+import plotly.express as px
 
 #%%
 
@@ -46,6 +49,30 @@ def coco_annotation_to_df(coco_annotation_file):
     all_merged_df.dropna(subset=["file_name"], inplace=True)
     return all_merged_df
 
+
+def compute_foreground_area_union(df):
+    def bbox_area_union(group):
+        polys = []
+        for _, row in group.iterrows():
+            x_min = row["bbox_x"]
+            y_min = row["bbox_y"]
+            x_max = row["bbox_x"] + row["bbox_w"]
+            y_max = row["bbox_y"] + row["bbox_h"]
+            polys.append(box(x_min, y_min, x_max, y_max))
+
+        if not polys:
+            return 0.0
+
+        union_poly = unary_union(polys)
+        return union_poly.area 
+    ratios = (
+        df.groupby("image_id")
+          .apply(bbox_area_union)
+          .rename("foreground_union_area_per_image")
+          .reset_index()
+    )
+
+    return df.merge(ratios, on="image_id")
 
 #%%    
 
@@ -169,15 +196,22 @@ class ObjectStats:
         #self.df["foreground_ratio"] = self.df["bbox_area"] / self.df["image_area"]               
         #self.df["occupancy_per_image"] = self.df.groupby("image_id")["bbox_area"].transform("sum") / self.df["image_area"]
         self.df = compute_foreground_area_union(self.df)
-        self.df["occupancy_per_image"] = self.df["foreground_union_area_per_image"] / self.df["imagea_area"]
+        self.df["occupancy_per_image"] = self.df["foreground_union_area_per_image"] / self.df["image_area"]
         self.df["background_area_per_image"] = self.df["image_area"] - self.df["foreground_union_area_per_image"]
         self.df["foreground_to_background_area_per_image"] = (self.df["foreground_union_area_per_image"]
                                                                / self.df["background_area_per_image"]
                                                                )
+        self.df["background_area_norm"] = self.df["background_area_per_image"] / self.df["image_area"]
+        self.df["foreground_occupancy_to_background_occupany"] = self.df["occupancy_per_image"] / self.df["background_area_norm"]
+        
         num_bboxes = self.df.groupby("image_id").size().rename("num_bboxes_per_image").reset_index()
         self.df = self.df.merge(num_bboxes, on="image_id", how="left")
-        bbox_area_norm_var = self.df.groupby("image_id")["bbox_area_norm"].var().fillna(0)
-        self.df["bbox_area_norm_variance_per_image"] = self.df.merge(bbox_area_norm_var, on="image_id", how="left")
+        bbox_area_norm_var = (self.df.groupby("image_id")
+                              ["bbox_area_norm"].var()
+                              .fillna(0)
+                              .rename("bbox_area_norm_variance_per_image")
+                              )
+        self.df = self.df.merge(bbox_area_norm_var, on="image_id", how="left")
     
     
     def class_distribution(self):
@@ -405,19 +439,19 @@ class ObjectStats:
         bbox_area_bins_ratio = self.df["area_bin_label"].value_counts(normalize=True).to_dict()
         object_bbox_area_per_bins = self.df.groupby(["area_bin_label", "category_name"]).size().unstack(fill_value=0)
         
-        # occupancy_per_image_mean = self.df["occupancy_per_image"].mean()
-        # occupancy_per_image_min = self.df["occupancy_per_image"].min()
-        # occupancy_per_image_max = self.df["occupancy_per_image"].max()
-        # occupancy_per_image_median = self.df["occupancy_per_image"].median()
-        # occupancy_per_image_std = self.df["occupancy_per_image"].std()
+        occupancy_per_image_mean = self.df["occupancy_per_image"].mean()
+        occupancy_per_image_min = self.df["occupancy_per_image"].min()
+        occupancy_per_image_max = self.df["occupancy_per_image"].max()
+        occupancy_per_image_median = self.df["occupancy_per_image"].median()
+        occupancy_per_image_std = self.df["occupancy_per_image"].std()
         
-        # scene_stats = {"occupancy_per_image": {"mean": occupancy_per_image_mean,
-        #                                         "min": occupancy_per_image_min,
-        #                                         "max": occupancy_per_image_max,
-        #                                         "median": occupancy_per_image_median,
-        #                                         "std": occupancy_per_image_std
-        #                                         }
-        #                 }
+        scene_stats = {"occupancy_per_image": {"mean": occupancy_per_image_mean,
+                                                "min": occupancy_per_image_min,
+                                                "max": occupancy_per_image_max,
+                                                "median": occupancy_per_image_median,
+                                                "std": occupancy_per_image_std
+                                                }
+                         }
         bbox_stats = {"objects_in_image": {"mean": avg_objects,
                                             "min": min_object_per_image,
                                             "max": max_object_per_image,
@@ -983,18 +1017,20 @@ test_compdf.groupby("bbox_area_bin_label").size()
 
 class DomainShiftScore:
     def __init__(self, drift_scores: dict,
-                 weights: dict,
-                 normalize_drift_scores,
+                 weights: dict = None,
+                 normalize_drift_scores = False,
                  **kwargs
                  ):
         self.drift_scores = drift_scores
         self.weights = weights
         self.normalize = normalize_drift_scores
         
+        
         if self.weights is None:
             total_num_drifts = len(self.drift_scores)
             self.weights = {k: 1.0/total_num_drifts for k in self.drift_scores.keys()}
-            
+        
+        #if self.weights.values().sum() > 1.0:
         if normalize_drift_scores:
             max_value = max(self.drift_scores.values())
             self.norm_drift_scores = {k: v/max_value for k,v in self.drift_scores.items()}
@@ -1080,6 +1116,17 @@ class DriftMetricSuite:
                                                                     }  
                     
         return self.drift_results
+
+
+def plot_drift_radar(drift_scores: List[float], 
+                     drift_properties: List[str],
+                     title=None 
+                     ):
+    fig = px.line_polar(r=drift_scores, theta=drift_properties,
+                        template="plotly_dark",
+                        title=title
+                        )
+    return fig
             
 #%%
 train_df.columns
@@ -1111,127 +1158,162 @@ drift_results
 
 
 #%%
-
-for _, row in train_df.groupby("image_id").iterrows():
-    print(row)
-    break    
-
-
-#%%
-
-from shapely.geometry import box
-from shapely.ops import unary_union
-
-def compute_foreground_ratio_union(df):
-    def per_image_union(group):
-        polys = []
-        for _, row in group.iterrows():
-            x_min = row["bbox_x"]
-            y_min = row["bbox_y"]
-            x_max = row["bbox_x"] + row["bbox_w"]
-            y_max = row["bbox_y"] + row["bbox_h"]
-            polys.append(box(x_min, y_min, x_max, y_max))
-
-        if not polys:
-            return 0.0
-
-        union_poly = unary_union(polys)
-        img_area = group["image_width"].iloc[0] * group["image_height"].iloc[0]
-        return union_poly.area / img_area
-
-    ratios = (
-        df.groupby("image_id")
-          .apply(per_image_union)
-          .rename("foreground_ratio_union")
-          .reset_index()
-    )
-
-    return df.merge(ratios, on="image_id")
-
-
+drift_results.keys()
+drift_radar_data = {}
+drift_property = []
+drift_metric = []
+for k, v in drift_results.items():
+    if k.startswith("('train', 'val')") and k.endswith("js"):
+        drift_property.append(v["property"])
+        drift_metric.append(v["js"])
     
-def compute_foreground_area_union(df):
-    def bbox_area_union(group):
-        polys = []
-        for _, row in group.iterrows():
-            x_min = row["bbox_x"]
-            y_min = row["bbox_y"]
-            x_max = row["bbox_x"] + row["bbox_w"]
-            y_max = row["bbox_y"] + row["bbox_h"]
-            polys.append(box(x_min, y_min, x_max, y_max))
-
-        if not polys:
-            return 0.0
-
-        union_poly = unary_union(polys)
-        return union_poly.area 
-    ratios = (
-        df.groupby("image_id")
-          .apply(bbox_area_union)
-          .rename("foreground_union_area_per_image")
-          .reset_index()
-    )
-
-    return df.merge(ratios, on="image_id")
-
 #%%
-
-trn_df = compute_foreground_ratio_union(train_df)
-
-#%%
-
-trn_df[["foreground_ratio_union", "foreground_ratio", "bbox_area_norm",
-        "occupancy_per_image"
-        ]]
-
-#%%
-
-trn_df[trn_df["foreground_ratio_union"] > trn_df["occupancy_per_image"]]
 
 
 
 #%%
 
+drift_radar_plot = plot_drift_radar(drift_scores=drift_metric,
+                                    drift_properties=drift_property,
+                                    title="JS Divergence"
+                                    )
 
-num_bboxes = trn_df.groupby("image_id").size().rename("num_bboxes").reset_index()#["bbox"].count()
+#%%
 
-td = trn_df.merge(num_bboxes, on="image_id", how="left")
+drift_radar_plot
+
+
+
+#%%
+import pandas as pd
+from datetime import datetime
+
+def create_dataset_card(df: pd.DataFrame, output_path: str = "DATASET_CARD.md"):
+    """
+    Generate a dataset card summarizing dataset metadata and computed data-centric ML metrics.
+    """
+
+    # Basic dataset stats
+    num_images = df["image_id"].nunique()
+    num_annotations = len(df)
+    classes = df["category_id"].nunique() if "category_id" in df.columns else "N/A"
+
+    # Aggregate metrics (per-image)
+    per_image = df.drop_duplicates("image_id")
+
+    # Build Markdown content
+    md = f"""
+# 📘 Dataset Card
+
+**Generated:** {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+
+---
+
+## 1. Dataset Overview
+
+- **Number of images:** {num_images}
+- **Number of annotations:** {num_annotations}
+- **Number of classes:** {classes}
+
+This dataset card summarizes the dataset and the data-centric ML metrics computed so far.
+
+---
+
+## 2. Annotation Statistics
+
+### 2.1 Bounding Box Metrics (Per-object)
+
+| Metric | Description |
+|--------|-------------|
+| `bbox_area_norm` | Normalized bbox area relative to image area |
+| `bbox_aspect_ratio` | Width / height |
+| `center_x_norm`, `center_y_norm` | Normalized bbox center coordinates |
+
+**Summary:**
+
+- Mean bbox area norm: {df["bbox_area_norm"].mean():.4f}
+- Median bbox area norm: {df["bbox_area_norm"].median():.4f}
+- Mean aspect ratio: {df["bbox_aspect_ratio"].mean():.4f}
+
+---
+
+## 3. Per-Image Metrics
+
+### 3.1 Object Count & Size Diversity
+
+| Metric | Description |
+|--------|-------------|
+| `num_bboxes_per_image` | Number of objects per image |
+| `bbox_area_norm_variance_per_image` | Variance of object sizes within each image |
+
+**Summary:**
+
+- Mean objects per image: {per_image["num_bboxes_per_image"].mean():.2f}
+- Mean bbox size variance: {per_image["bbox_area_norm_variance_per_image"].mean():.4f}
+
+---
+
+### 3.2 Foreground & Background Structure
+
+| Metric | Description |
+|--------|-------------|
+| `foreground_union_area_per_image` | True foreground area (union of all bboxes) |
+| `occupancy_per_image` | Sum of bbox areas / image area |
+| `background_area_norm` | Background area / image area |
+| `foreground_to_background_area_per_image` | Foreground-background contrast (union-based) |
+| `foreground_occupancy_to_background_occupancy` | Contrast using summed bbox areas |
+
+**Summary:**
+
+- Mean foreground ratio (union): {per_image["foreground_union_area_per_image"].mean():.4f}
+- Mean occupancy (sum of areas): {per_image["occupancy_per_image"].mean():.4f}
+- Mean foreground/background contrast (union): {per_image["foreground_to_background_area_per_image"].mean():.4f}
+
+---
+
+## 4. Data-Centric ML Interpretation
+
+### 4.1 What These Metrics Reveal
+
+- **Scale drift:** via `bbox_area_norm`, `avg_bbox_area_norm`, `bbox_area_norm_variance_per_image`
+- **Composition drift:** via `num_bboxes_per_image`
+- **Scene density drift:** via `occupancy_per_image`
+- **Foreground-background structure:** via `foreground_union_area_per_image`, contrast ratios
+- **Annotation style drift:** via differences between union-based and sum-based metrics
+
+These metrics together provide a **non-redundant, multi-axis view** of dataset quality and domain shift.
+
+---
+
+## 5. Known Limitations & Future Work
+
+- Add class distribution metrics  
+- Add image-level visual statistics (brightness, contrast, entropy)  
+- Add embedding-based drift metrics  
+- Add spatial distribution heatmaps  
+- Add temporal or source-based metadata if available  
+
+---
+
+## 6. Citation
+
+If you use this dataset card or the metrics, please cite your project or organization accordingly.
+
+---
+
+*This dataset card was automatically generated as part of a data-centric ML pipeline.*
+"""
+
+    # Write to file
+    with open(output_path, "w") as f:
+        f.write(md)
+
+    print(f"Dataset card created at: {output_path}")
 
 
 #%%
 
-td.columns
-#%%
-
-td["image_id"].max()
-#pd.concat()
-td[td["image_id"]==2100][["image_id","num_bboxes"]]
-#%%
-num_bboxes["image_id"].max()
-num_bboxes[num_bboxes["image_id"]==2100][["image_id","num_bboxes"]]
-
-#%%
-
-trn_df.columns
-
-#%%
-
-td.sort_values(by="image_id")[["image_id", "num_bboxes"]]
-
-#%%
-
-num_bboxes.sort_values(by="image_id")
-#%%
-
-
-#trn_df.drop("num_bboxes", axis=1, inplace=True)
-
-td["bbox_area_norm"].var()
-
-td.groupby("image_id")["bbox_area_norm"].var().fillna(0)
-#%%
-
-trn_df#.columns
+create_dataset_card(train_df)
 # %%
 
 js_divergence_between_distributions(train_df, val_df, field_name="area_bin_label", 
