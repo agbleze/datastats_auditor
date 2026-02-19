@@ -50,6 +50,10 @@ def build_motivations_and_use(
         return "\n".join([f"- {item}" for item in items])
 
     section = f"""
+<p style="color:#2A7FFF; font-size:20px; font-weight:bold;">
+Dataset Summary
+</p>
+
 # Motivations & Use
 
 ## Dataset Purpose(s)
@@ -102,4 +106,31 @@ mkd_render = MarkdownRenderer()
 cardgen = DatasetCardCreator(sections=motsect, renderer=mkd_render)
 # %%
 cardgen.generate()
+# %%
+import pypandoc
+
+#pypandoc.download_pandoc()
+pypandoc.convert_file(
+    "DATASET_CARD.md",
+    "pdf",
+    outputfile="DATASET_CARD.pdf"
+)
+
+# %%
+def create_section(*args, **kwargs):
+    #def bullets(items):
+    #    return "\n".join([f"- {item}" for item in items])
+    
+    header = kwargs.get("header")
+    sect_content = [f"- {key}: {value}" for key, value in kwargs.items() if key != "header"]
+    
+    
+    section = f""" 
+# {header}
+
+{sect_content}
+    
+    """
+    return section
+    
 # %%
