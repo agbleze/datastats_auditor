@@ -50,10 +50,6 @@ def build_motivations_and_use(
         return "\n".join([f"- {item}" for item in items])
 
     section = f"""
-<p style="color:#2A7FFF; font-size:20px; font-weight:bold;">
-Dataset Summary
-</p>
-
 # Motivations & Use
 
 ## Dataset Purpose(s)
@@ -93,13 +89,13 @@ class MarkdownRenderer:
     
 #%%
 
-content = build_motivations_and_use(
+moti_content = build_motivations_and_use(
     intended_tasks=["Object detection", "Fairness evaluation"],
     intended_objects=["Person", "Helmet", "Safety vest"],
 )
-print(content)
+print(moti_content)
 # %%
-motsect = {"Motivation and Intended Use": content}
+motsect = {"Motivation and Intended Use": moti_content}
 
 mkd_render = MarkdownRenderer()
 
@@ -118,19 +114,189 @@ pypandoc.convert_file(
 
 # %%
 def create_section(*args, **kwargs):
-    #def bullets(items):
-    #    return "\n".join([f"- {item}" for item in items])
-    
-    header = kwargs.get("header")
-    sect_content = [f"- {key}: {value}" for key, value in kwargs.items() if key != "header"]
-    
-    
+    kwargs = kwargs.get("kwargs")
+    header = kwargs.get("header", "")
+    header = f"📘 {header}" if header else ""
+    sect_content = "\n".join([f"- {key}: {value}" for key, value in kwargs.items() if key != "header"])
+    #sect_content = "\n".join(sect_content)
+    # font-size:20px;
     section = f""" 
-# {header}
+<H1 style="color:#2A7FFF; font-weight:bold;">
+ {header}
+</H1>
 
 {sect_content}
     
     """
-    return section
+    return section.strip()
     
 # %%
+import uuid
+
+
+summary_kwargs = {#"header": "1. Summary",
+                "Name": "demo data",
+                "Version ID": str(uuid.uuid1()),
+                "Modality": "Image",
+                "Number of images": 1234,
+                "Number of objects": 5678,
+                "Objects labeled": ["cocoa", "tomato", "coconut"],
+                "Object counts per split": {"train": 123, "val": 23, "test": 56}
+                }
+
+
+auth_kwargs = {"header": "2. Authorship & Ownership",
+                "Organization": "ORG",
+                "Industry": "TECH",
+                "Dataset owners": "AI TEAM"                   
+                }
+
+data_col_kwargs = {"header": "4. Data Collection",
+                    "Collection strategy": "camera recording",
+                    "Devices": "mobile phone",
+                    "Collection Sites": "farm",
+                    "Environmental conditions": "indoor/outdoor, lighting, weather"
+                    }
+
+
+labelling_kwargs = {"header": "5. Annotation & Labeling",
+                    "Labeling method": "human",
+                    "Label types": "bbox, segmentation mask",
+                    "Annotation format": "COCO",
+                    "Annotation review method": "(SME, same labelers, etc.)",
+                    "Platform": "CVAT"    
+                    }
+
+licence_kwargs = {"header": "9. Licensing & Usage",
+                "License": "BSD",
+                "Usage restrictions": "Internal-only",
+                "Redistribution policy": "N/A"
+                }
+
+trans_kwargs = {"header":"Transformation",
+                "Technique":"Augmentation",
+                "Parameters": {},
+
+                "Libraries used": "Augment" 
+    
+}
+
+
+split_kwargs = {"header": "Data Split Composition",
+                "Algorithm": "similarity‑based splitter",
+                    "Parameters": {"seed":123, "object_based": True, 
+                                "train_ratio": 0.8
+                                },
+                    "package": "cluster-aware-spliter"
+                }
+#%%
+
+summary_section = create_section(kwargs=summary_kwargs)
+authorship_section = create_section(kwargs=auth_kwargs)
+data_collection_section = create_section(kwargs=data_col_kwargs)
+labelling_section = create_section(kwargs=labelling_kwargs)
+split_section = create_section(kwargs=split_kwargs)
+transformation_section = create_section(kwargs=trans_kwargs)
+license_section = create_section(kwargs=licence_kwargs)
+
+# %%
+sections = {"Authorship & Ownership": authorship_section,
+            "Data Summary": summary_section,            
+            "Motivation and Intended Use": moti_content,
+            "Data Collection": data_collection_section,
+            "Annotation & Labeling": labelling_section,
+            "Data Split Composition": split_section,
+            "Transformation": transformation_section,
+            "License & Usage": license_section
+                       
+            }
+cardgen = DatasetCardCreator(sections=sections, renderer=mkd_render)
+# %%
+cardgen.generate()
+# %%
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#%%
+"""
+TODO. CREate func to generate sections for this with each 
+preprocessing step being a subheading to - Preprocessing & Data Preparation
+6. Preprocessing & Data Preparation
+This is where your detailed technical pipeline belongs.
+
+6.1 Data Cleaning & Sampling
+Deduplication (exact)
+
+Algorithm
+
+Parameters
+
+Package + version
+
+Deduplication (near‑duplicate)
+
+Algorithm
+
+Parameters
+
+Package + version
+
+Cross‑filtering
+
+Algorithm
+
+Parameters
+
+Package + version
+
+
+
+# TODO: Explore option of creating a decorator that can be used to
+generate this section of card
+
+7. Data Metrics (Data‑Centric ML Quality Metrics)
+This is your signature section.
+
+7.1 Bias & Fairness Metrics
+(If applicable)
+
+7.2 Structural Characteristics Metrics
+(e.g., occupancy, foreground/background ratios)
+
+7.3 Spatial Distribution Metrics
+(e.g., bbox center heatmaps, spatial entropy)
+
+7.4 Image‑Level Statistics
+(brightness, contrast, entropy)
+
+7.5 Object‑Level Statistics
+(bbox area norm, aspect ratio, etc.)
+
+7.6 Split‑Level Statistics
+(per‑split distributions)
+
+7.7 Split Drift Metrics
+(JS divergence, histograms, plots)
+
+This section is now cleanly grouped and expandable.
+"""
+    
+    
