@@ -12,6 +12,7 @@ class DatasetCardCreator:
         text = self.renderer.render(self.sections)
         Path(output_path).write_text(text, encoding="utf-8")
         print(f"Dataset card created at: {output_path}")
+        return text
         
         
 
