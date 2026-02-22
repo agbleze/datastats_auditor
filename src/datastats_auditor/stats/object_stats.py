@@ -1,9 +1,6 @@
 
 
 #%%
-
-import os
-from glob import glob
 from pathlib import Path
 from PIL import Image
 import numpy as np
