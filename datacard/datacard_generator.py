@@ -214,12 +214,87 @@ sections = {"Authorship & Ownership": authorship_section,
 cardgen = DatasetCardCreator(sections=sections, renderer=mkd_render)
 # %%
 cardgen.generate()
-# %%
 
+#%%  ###############
 
+import plotly.express as px
+import pandas as pd
+from markdown import markdown
+from weasyprint import HTML
+import base64
+from io import BytesIO
 
+def generate_dataset_card_with_embedded_plot(
+    df: pd.DataFrame,
+    md_path="dataset_card.md",
+    pdf_path="dataset_card.pdf"
+):
+    # ---------------------------------------------------------
+    # 1. Create Plotly figure
+    # ---------------------------------------------------------
+    fig = px.histogram(
+        df,
+        x="bbox_area_norm",
+        title="BBox Area Distribution",
+        nbins=20
+    )
 
+    # ---------------------------------------------------------
+    # 2. Convert Plotly figure → base64 PNG (no file saved)
+    # ---------------------------------------------------------
+    img_bytes = fig.to_image(format="png")  # requires kaleido
+    img_b64 = base64.b64encode(img_bytes).decode("utf-8")
+    img_md = f"![plot](data:image/png;base64,{img_b64})"
 
+    # ---------------------------------------------------------
+    # 3. Build Markdown content with embedded image
+    # ---------------------------------------------------------
+    md_content = f"""
+# Dataset Card
+
+## Data-Centric Metrics
+
+### BBox Area Distribution
+
+The histogram below shows the distribution of normalized bounding box areas.
+
+{img_md}
+
+---
+
+### Summary Statistics
+
+- Mean bbox area norm: **{df['bbox_area_norm'].mean():.4f}**
+- Median bbox area norm: **{df['bbox_area_norm'].median():.4f}**
+- Std bbox area norm: **{df['bbox_area_norm'].std():.4f}**
+"""
+
+    # Save Markdown
+    with open(md_path, "w") as f:
+        f.write(md_content)
+
+    # ---------------------------------------------------------
+    # 4. Convert Markdown → HTML
+    # ---------------------------------------------------------
+    html = markdown(md_content, output_format="html5")
+
+    # ---------------------------------------------------------
+    # 5. Convert HTML → PDF
+    # ---------------------------------------------------------
+    HTML(string=html).write_pdf(pdf_path)
+
+    print("Markdown saved:", md_path)
+    print("PDF saved:", pdf_path)
+
+#%%
+
+df = pd.DataFrame({
+    "bbox_area_norm": [0.1, 0.2, 0.05, 0.3, 0.15, 0.22, 0.18]
+})
+
+generate_dataset_card_with_embedded_plot(df)
+
+#%%
 
 
 
