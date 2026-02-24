@@ -420,18 +420,19 @@ class ObjectStats:
 
         clutter_score = objects_per_image.mean() / (self.df["image_width"] * self.df["image_height"]).mean()
 
-        foreground_ratio_mean = self.df["foreground_ratio"].mean()
-        foreground_ratio_min = self.df["foreground_ratio"].min()
-        foreground_ratio_max = self.df["foreground_ratio"].max()
-        foreground_ratio_median = self.df["foreground_ratio"].median()
-        foreground_ratio_std = self.df["foreground_ratio"].std()
+        foreground_to_background_area_per_image_mean = self.df["foreground_to_background_area_per_image"].mean()
+        foreground_to_background_area_per_image_min = self.df["foreground_to_background_area_per_image"].min()
+        foreground_to_background_area_per_image_max = self.df["foreground_to_background_area_per_image"].max()
+        foreground_to_background_area_per_image_median = self.df["foreground_to_background_area_per_image"].median()
+        foreground_to_background_area_per_image_std = self.df["foreground_to_background_area_per_image"].std()
 
 
-        object_foreground_ratio_mean = self.df.groupby("category_name")["foreground_ratio"].mean().to_dict()
-        object_foreground_ratio_max = self.df.groupby("category_name")["foreground_ratio"].max().to_dict()
-        object_foreground_ratio_min = self.df.groupby("category_name")["foreground_ratio"].min().to_dict()
-        object_foreground_ratio_median = self.df.groupby("category_name")["foreground_ratio"].median().to_dict()
-        object_foreground_ration_std = self.df.groupby("category_name")["foreground_ratio"].std().to_dict()
+
+        object_foreground_to_background_area_per_image_mean = self.df.groupby("category_name")["foreground_to_background_area_per_image"].mean().to_dict()
+        object_foreground_to_background_area_per_image_max = self.df.groupby("category_name")["foreground_to_background_area_per_image"].max().to_dict()
+        object_foreground_to_background_area_per_image_min = self.df.groupby("category_name")["foreground_to_background_area_per_image"].min().to_dict()
+        object_foreground_to_background_area_per_image_median = self.df.groupby("category_name")["foreground_to_background_area_per_image"].median().to_dict()
+        object_foreground_to_background_area_per_image_std = self.df.groupby("category_name")["foreground_to_background_area_per_image"].std().to_dict()
 
         bbox_area_bins_ratio = self.df["area_bin_label"].value_counts(normalize=True).to_dict()
         object_bbox_area_per_bins = self.df.groupby(["area_bin_label", "category_name"]).size().unstack(fill_value=0)
@@ -455,12 +456,13 @@ class ObjectStats:
                                             "median": median_objects_per_image,
                                             "std": objects_per_image.std()
                                             },
-                      "foreground_ratio": {"mean": foreground_ratio_mean,
-                                            "min": foreground_ratio_min,
-                                            "max": foreground_ratio_max,
-                                            "median": foreground_ratio_median,
-                                            "std": foreground_ratio_std
+                      "foreground_to_background_area_per_image": {"mean": foreground_to_background_area_per_image_mean,
+                                            "min": foreground_to_background_area_per_image_min,
+                                            "max": foreground_to_background_area_per_image_max,
+                                            "median": foreground_to_background_area_per_image_median,
+                                            "std": foreground_to_background_area_per_image_std
                                             },
+                      
                       "small_object": {"ratio": small_ratio},
                       "medium_object": {"ratio": medium_ratio},
                       "large_object": {"ratio": large_ratio},
@@ -469,11 +471,11 @@ class ObjectStats:
                       }
         
         object_stats = {"images_per_object_ratio": images_per_object_ratio.to_dict(),
-                        "foreground_ratio": {"mean": object_foreground_ratio_mean,
-                                            "min": object_foreground_ratio_min,
-                                            "max": object_foreground_ratio_max,
-                                            "median": object_foreground_ratio_median,
-                                            "std": object_foreground_ration_std
+                        "foreground_to_background_area_per_image": {"mean": object_foreground_to_background_area_per_image_mean,
+                                            "min": object_foreground_to_background_area_per_image_min,
+                                            "max": object_foreground_to_background_area_per_image_max,
+                                            "median": object_foreground_to_background_area_per_image_median,
+                                            "std": object_foreground_to_background_area_per_image_std
                                             },
                         "bbox_area_ratio_per_bin": object_bbox_area_per_bins.to_dict()
                         }
