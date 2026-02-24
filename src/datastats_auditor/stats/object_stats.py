@@ -106,7 +106,7 @@ train_annot_df["center_y"] = (train_annot_df["bbox_y"] + train_annot_df["bbox_h"
 
 # normalize
 train_annot_df["relative_x_center"] = train_annot_df["center_x"] / train_annot_df["image_width"]
-train_annot_df["center_y_norm"] = train_annot_df["center_y"] / train_annot_df["image_height"]
+train_annot_df["relative_y_center"] = train_annot_df["center_y"] / train_annot_df["image_height"]
 
 
 
@@ -285,11 +285,11 @@ class ObjectStats:
                                 "max": self.df.groupby("category_name")["relative_x_center"].max().to_dict()
                                 }
                                  
-        objects_center_y_norm = {"mean": self.df.groupby("category_name")["center_y_norm"].mean().to_dict(),
-                                "median": self.df.groupby("category_name")["center_y_norm"].median().to_dict(),
-                                "std": self.df.groupby("category_name")["center_y_norm"].std().to_dict(),
-                                "min": self.df.groupby("category_name")["center_y_norm"].min().to_dict(),
-                                "max": self.df.groupby("category_name")["center_y_norm"].max().to_dict()
+        objects_relative_y_center = {"mean": self.df.groupby("category_name")["relative_y_center"].mean().to_dict(),
+                                "median": self.df.groupby("category_name")["relative_y_center"].median().to_dict(),
+                                "std": self.df.groupby("category_name")["relative_y_center"].std().to_dict(),
+                                "min": self.df.groupby("category_name")["relative_y_center"].min().to_dict(),
+                                "max": self.df.groupby("category_name")["relative_y_center"].max().to_dict()
                                 }
                         
         
@@ -342,11 +342,11 @@ class ObjectStats:
                                         "min": self.df["relative_x_center"].min(),
                                         "max": self.df["relative_x_center"].max()
                                     }
-        bbox_stats_center_y_norm =  {"mean": self.df["center_y_norm"].mean(),
-                                    "median": self.df["center_y_norm"].median(),
-                                    "std": self.df["center_y_norm"].std(),
-                                    "min": self.df["center_y_norm"].min(),
-                                    "max": self.df["center_y_norm"].max()
+        bbox_stats_relative_y_center =  {"mean": self.df["relative_y_center"].mean(),
+                                    "median": self.df["relative_y_center"].median(),
+                                    "std": self.df["relative_y_center"].std(),
+                                    "min": self.df["relative_y_center"].min(),
+                                    "max": self.df["relative_y_center"].max()
                                     }
         
         objects_stats = {"area": objects_area_stats,
@@ -357,7 +357,7 @@ class ObjectStats:
                         "center_x": objects_center_x,
                         "center_y": objects_center_y,
                         "relative_x_center": objects_relative_x_center,
-                        "center_y_norm": objects_center_y_norm
+                        "relative_y_center": objects_relative_y_center
                         }
         bbox_stats = {"aspect_ratio": bbox_stats_aspect_ratio,
                        "area": bbox_stats_area,
@@ -367,7 +367,7 @@ class ObjectStats:
                         "center_x": bbox_stats_center_x,
                         "center_y": bbox_stats_center_y,
                         "relative_x_center": bbox_stats_relative_x_center,
-                        "center_y_norm": bbox_stats_center_y_norm
+                        "relative_y_center": bbox_stats_relative_y_center
                         }
         
         result = {"objects_stats": objects_stats,
@@ -377,7 +377,7 @@ class ObjectStats:
     
     def spatial_distribution(self, bins=20):
         heatmap, xedges, yedges = np.histogram2d(self.df["relative_x_center"], 
-                                                 self.df["center_y_norm"], 
+                                                 self.df["relative_y_center"], 
                                                  bins=bins, range=[[0, 1], [0, 1]]
                                                  )
         res = {
@@ -1227,7 +1227,7 @@ This dataset card summarizes the dataset and the data-centric ML metrics compute
 |--------|-------------|
 | `relative_bbox_area` | Normalized bbox area relative to image area |
 | `bbox_aspect_ratio` | Width / height |
-| `relative_x_center`, `center_y_norm` | Normalized bbox center coordinates |
+| `relative_x_center`, `relative_y_center` | Normalized bbox center coordinates |
 
 **Summary:**
 
