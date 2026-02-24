@@ -300,7 +300,7 @@ class ObjectStats:
                             "min": self.df["bbox_area"].min(),
                             "max": self.df["bbox_area"].max()
                         }
-        bbox_stats_area_norm = {"mean": self.df["relative_bbox_area"].mean(),
+        relative_bbox_area_stats = {"mean": self.df["relative_bbox_area"].mean(),
                                 "median": self.df["relative_bbox_area"].median(),
                                 "std": self.df["relative_bbox_area"].std(),
                                 "min": self.df["relative_bbox_area"].min(),
@@ -361,7 +361,7 @@ class ObjectStats:
                         }
         bbox_stats = {"aspect_ratio": bbox_stats_aspect_ratio,
                        "area": bbox_stats_area,
-                       "area_norm": bbox_stats_area_norm,
+                       "relative_area": relative_bbox_area_stats,
                         "height": bbox_stats_height,
                         "width": bbox_stats_width,
                         "center_x": bbox_stats_center_x,
