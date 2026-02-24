@@ -105,7 +105,7 @@ train_annot_df["center_x"] = (train_annot_df["bbox_x"] + train_annot_df["bbox_w"
 train_annot_df["center_y"] = (train_annot_df["bbox_y"] + train_annot_df["bbox_h"]) / 2
 
 # normalize
-train_annot_df["center_x_norm"] = train_annot_df["center_x"] / train_annot_df["image_width"]
+train_annot_df["relative_x_center"] = train_annot_df["center_x"] / train_annot_df["image_width"]
 train_annot_df["center_y_norm"] = train_annot_df["center_y"] / train_annot_df["image_height"]
 
 
@@ -187,8 +187,8 @@ class ObjectStats:
         self.df["center_y"] = (self.df["bbox_y"] + self.df["bbox_h"]) / 2
 
         # normalize
-        self.df["center_x_norm"] = self.df["center_x"] / self.df["image_width"]
-        self.df["center_y_norm"] = self.df["center_y"] / self.df["image_height"]
+        self.df["relative_x_center"] = self.df["center_x"] / self.df["image_width"]
+        self.df["relative_y_center"] = self.df["center_y"] / self.df["image_height"]
         
         #self.df["foreground_ratio"] = self.df["bbox_area"] / self.df["image_area"]               
         #self.df["occupancy_per_image"] = self.df.groupby("image_id")["bbox_area"].transform("sum") / self.df["image_area"]
@@ -278,11 +278,11 @@ class ObjectStats:
                             "max": self.df.groupby("category_name")["center_y"].max().to_dict()
                             }
                             
-        objects_center_x_norm = {"mean": self.df.groupby("category_name")["center_x_norm"].mean().to_dict(),
-                                "median": self.df.groupby("category_name")["center_x_norm"].median().to_dict(),
-                                "std": self.df.groupby("category_name")["center_x_norm"].std().to_dict(),
-                                "min": self.df.groupby("category_name")["center_x_norm"].min().to_dict(),
-                                "max": self.df.groupby("category_name")["center_x_norm"].max().to_dict()
+        objects_relative_x_center = {"mean": self.df.groupby("category_name")["relative_x_center"].mean().to_dict(),
+                                "median": self.df.groupby("category_name")["relative_x_center"].median().to_dict(),
+                                "std": self.df.groupby("category_name")["relative_x_center"].std().to_dict(),
+                                "min": self.df.groupby("category_name")["relative_x_center"].min().to_dict(),
+                                "max": self.df.groupby("category_name")["relative_x_center"].max().to_dict()
                                 }
                                  
         objects_center_y_norm = {"mean": self.df.groupby("category_name")["center_y_norm"].mean().to_dict(),
@@ -336,11 +336,11 @@ class ObjectStats:
                                 "min": self.df["center_y"].min(),
                                 "max": self.df["center_y"].max()
                                 }
-        bbox_stats_center_x_norm  =   {"mean": self.df["center_x_norm"].mean(),
-                                        "median": self.df["center_x_norm"].median(),
-                                        "std": self.df["center_x_norm"].std(),
-                                        "min": self.df["center_x_norm"].min(),
-                                        "max": self.df["center_x_norm"].max()
+        bbox_stats_relative_x_center  =   {"mean": self.df["relative_x_center"].mean(),
+                                        "median": self.df["relative_x_center"].median(),
+                                        "std": self.df["relative_x_center"].std(),
+                                        "min": self.df["relative_x_center"].min(),
+                                        "max": self.df["relative_x_center"].max()
                                     }
         bbox_stats_center_y_norm =  {"mean": self.df["center_y_norm"].mean(),
                                     "median": self.df["center_y_norm"].median(),
@@ -356,7 +356,7 @@ class ObjectStats:
                         "width": objects_width,
                         "center_x": objects_center_x,
                         "center_y": objects_center_y,
-                        "center_x_norm": objects_center_x_norm,
+                        "relative_x_center": objects_relative_x_center,
                         "center_y_norm": objects_center_y_norm
                         }
         bbox_stats = {"aspect_ratio": bbox_stats_aspect_ratio,
@@ -366,7 +366,7 @@ class ObjectStats:
                         "width": bbox_stats_width,
                         "center_x": bbox_stats_center_x,
                         "center_y": bbox_stats_center_y,
-                        "center_x_norm": bbox_stats_center_x_norm,
+                        "relative_x_center": bbox_stats_relative_x_center,
                         "center_y_norm": bbox_stats_center_y_norm
                         }
         
@@ -376,7 +376,7 @@ class ObjectStats:
         return result
     
     def spatial_distribution(self, bins=20):
-        heatmap, xedges, yedges = np.histogram2d(self.df["center_x_norm"], 
+        heatmap, xedges, yedges = np.histogram2d(self.df["relative_x_center"], 
                                                  self.df["center_y_norm"], 
                                                  bins=bins, range=[[0, 1], [0, 1]]
                                                  )
@@ -1138,7 +1138,8 @@ distributions = {"train": train_df,
 metrics = ["kl", "js"]
 
 field_to_bin = ['relative_bbox_area', 'bbox_aspect_ratio',
-                'foreground_ratio', 'occupancy_per_image'
+                'foreground_to_background_area_per_image', 
+                'occupancy_per_image'
                 ]
 
 #%%
@@ -1226,7 +1227,7 @@ This dataset card summarizes the dataset and the data-centric ML metrics compute
 |--------|-------------|
 | `relative_bbox_area` | Normalized bbox area relative to image area |
 | `bbox_aspect_ratio` | Width / height |
-| `center_x_norm`, `center_y_norm` | Normalized bbox center coordinates |
+| `relative_x_center`, `center_y_norm` | Normalized bbox center coordinates |
 
 **Summary:**
 
