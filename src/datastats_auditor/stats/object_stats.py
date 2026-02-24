@@ -95,7 +95,7 @@ train_annot_df["bbox_w"] = train_annot_df["bbox"].apply(lambda b: b[2])
 train_annot_df["bbox_h"] = train_annot_df["bbox"].apply(lambda b: b[3])
 
 train_annot_df["bbox_area"] = train_annot_df["bbox_w"] * train_annot_df["bbox_h"]
-train_annot_df["bbox_area_norm"] = train_annot_df["bbox_area"] / (train_annot_df["image_width"] * train_annot_df["image_height"])
+train_annot_df["relative_bbox_area"] = train_annot_df["bbox_area"] / (train_annot_df["image_width"] * train_annot_df["image_height"])
 train_annot_df["bbox_aspect_ratio"] = train_annot_df["bbox_w"] / train_annot_df["bbox_h"]
 
 
@@ -134,7 +134,7 @@ num_imgs = train_annot_df["image_id"].nunique()
 images_per_object = train_annot_df.groupby("category_name")["image_id"].nunique()
 images_per_object_ratio = images_per_object / num_imgs
 
-small_objects = train_annot_df[train_annot_df["bbox_area_norm"] < 0.01]
+small_objects = train_annot_df[train_annot_df["relative_bbox_area"] < 0.01]
 small_ratio = len(small_objects) / len(train_annot_df)
 small_ratio
 
@@ -148,7 +148,7 @@ train_annot_df.groupby("category_name")["foreground_ratio"].mean()
 
 #%%
 
-train_annot_df.groupby("category_name")["bbox_area_norm"].mean()
+train_annot_df.groupby("category_name")["relative_bbox_area"].mean()
 
 #%%
 
@@ -179,7 +179,7 @@ class ObjectStats:
         self.df["bbox_h"] = self.df["bbox"].apply(lambda b: b[3])
         self.df["image_area"] = self.df["image_width"] * self.df["image_height"]
         self.df["bbox_area"] = self.df["bbox_w"] * self.df["bbox_h"]
-        self.df["bbox_area_norm"] = self.df["bbox_area"] / self.df["image_area"] # area of each bbox wrt image area
+        self.df["relative_bbox_area"] = self.df["bbox_area"] / self.df["image_area"] # area of each bbox wrt image area
         self.df["bbox_aspect_ratio"] = self.df["bbox_w"] / self.df["bbox_h"]
 
         # compute object center coordinates
@@ -203,12 +203,12 @@ class ObjectStats:
         
         num_bboxes = self.df.groupby("image_id").size().rename("num_bboxes_per_image").reset_index()
         self.df = self.df.merge(num_bboxes, on="image_id", how="left")
-        bbox_area_norm_var = (self.df.groupby("image_id")
-                              ["bbox_area_norm"].var()
+        relative_bbox_area_var = (self.df.groupby("image_id")
+                              ["relative_bbox_area"].var()
                               .fillna(0)
-                              .rename("bbox_area_norm_variance_per_image")
+                              .rename("relative_bbox_area_variance_per_image")
                               )
-        self.df = self.df.merge(bbox_area_norm_var, on="image_id", how="left")
+        self.df = self.df.merge(relative_bbox_area_var, on="image_id", how="left")
     
     
     def class_distribution(self):
@@ -234,11 +234,11 @@ class ObjectStats:
                                 "max": self.df.groupby("category_name")["bbox_area"].max().to_dict()
                             }
                               
-        objects_area_norm_stats = {"mean": self.df.groupby("category_name")["bbox_area_norm"].mean().to_dict(),
-                                    "median": self.df.groupby("category_name")["bbox_area_norm"].median().to_dict(),
-                                    "std": self.df.groupby("category_name")["bbox_area_norm"].std().to_dict(),
-                                    "min": self.df.groupby("category_name")["bbox_area_norm"].min().to_dict(),
-                                    "max": self.df.groupby("category_name")["bbox_area_norm"].max().to_dict()
+        objects_area_norm_stats = {"mean": self.df.groupby("category_name")["relative_bbox_area"].mean().to_dict(),
+                                    "median": self.df.groupby("category_name")["relative_bbox_area"].median().to_dict(),
+                                    "std": self.df.groupby("category_name")["relative_bbox_area"].std().to_dict(),
+                                    "min": self.df.groupby("category_name")["relative_bbox_area"].min().to_dict(),
+                                    "max": self.df.groupby("category_name")["relative_bbox_area"].max().to_dict()
                                 }
                                    
         objects_aspect_ratio_stats = {"mean": self.df.groupby("category_name")["bbox_aspect_ratio"].mean().to_dict(),
@@ -300,11 +300,11 @@ class ObjectStats:
                             "min": self.df["bbox_area"].min(),
                             "max": self.df["bbox_area"].max()
                         }
-        bbox_stats_area_norm = {"mean": self.df["bbox_area_norm"].mean(),
-                                "median": self.df["bbox_area_norm"].median(),
-                                "std": self.df["bbox_area_norm"].std(),
-                                "min": self.df["bbox_area_norm"].min(),
-                                "max": self.df["bbox_area_norm"].max()
+        bbox_stats_area_norm = {"mean": self.df["relative_bbox_area"].mean(),
+                                "median": self.df["relative_bbox_area"].median(),
+                                "std": self.df["relative_bbox_area"].std(),
+                                "min": self.df["relative_bbox_area"].min(),
+                                "max": self.df["relative_bbox_area"].max()
                                 }
         bbox_stats_aspect_ratio = {"mean": self.df["bbox_aspect_ratio"].mean(),
                                     "median": self.df["bbox_aspect_ratio"].median(),
@@ -411,11 +411,11 @@ class ObjectStats:
         images_per_object = self.df.groupby("category_name")["image_id"].nunique()
         images_per_object_ratio = images_per_object / num_imgs
 
-        small_objects = self.df[self.df["bbox_area_norm"] <= small_object_threshold]
+        small_objects = self.df[self.df["relative_bbox_area"] <= small_object_threshold]
         small_ratio = len(small_objects) / len(self.df)
-        large_objects = self.df[self.df["bbox_area_norm"] >= large_object_threshold]
+        large_objects = self.df[self.df["relative_bbox_area"] >= large_object_threshold]
         large_ratio = len(large_objects) / len(self.df)
-        medium_objects = self.df[(self.df["bbox_area_norm"] > small_object_threshold) & (self.df["bbox_area_norm"] < large_object_threshold)]
+        medium_objects = self.df[(self.df["relative_bbox_area"] > small_object_threshold) & (self.df["relative_bbox_area"] < large_object_threshold)]
         medium_ratio = len(medium_objects) / len(self.df)
 
         clutter_score = objects_per_image.mean() / (self.df["image_width"] * self.df["image_height"]).mean()
@@ -503,7 +503,7 @@ class ObjectStats:
         return summary
     
     def compute_bbox_area_ratios(self, bins=None, n_bins=None, 
-                                 field_name="bbox_area_norm", 
+                                 field_name="relative_bbox_area", 
                                  strategy="quantile"):
         areas = self.df[field_name]#.clip(1e-9, 1.0)
         if bins is not None:
@@ -526,7 +526,7 @@ class ObjectStats:
         ratios = (counts / counts.sum()).sort_index()
         return ratios.to_dict()
     
-    def compute_bins(self, n_bins=5, field_name="bbox_area_norm", 
+    def compute_bins(self, n_bins=5, field_name="relative_bbox_area", 
                           strategy="quantile",
                           include_overflow_bin=True
                           ):
@@ -547,7 +547,7 @@ class ObjectStats:
         return bins
     
     def assign_bins(self, bins, labels, 
-                         field_to_bin="bbox_area_norm",
+                         field_to_bin="relative_bbox_area",
                          name_bin_field_as="area_bin", 
                          name_bin_field_label_as="area_bin_label"
                          ):
@@ -736,7 +736,7 @@ def compute_js_divergence_per_object(df1, df2, field_name, labels,
 
 #%%
 
-areas = train_df["bbox_area_norm"]#.clip(1e-9, 1.0)
+areas = train_df["relative_bbox_area"]#.clip(1e-9, 1.0)
 
 #%%
 
@@ -841,7 +841,7 @@ split_drift_res = split_stats_cls.compute_drift()
 
 
 #%%
-pd.concat([train_df["bbox_area_norm"], val_df["bbox_area_norm"]])
+pd.concat([train_df["relative_bbox_area"], val_df["relative_bbox_area"]])
 
 
 #%%
@@ -964,7 +964,7 @@ val_df.columns
 
 drift_cls = DriftStats(reference_distribution=train_df,
                        comparison_distribution=val_df,
-                       field_to_bin="bbox_area_norm",
+                       field_to_bin="relative_bbox_area",
                        name_bin_field_as="bbox_area_bin",
                        name_bin_field_label_as="bbox_area_bin_label"
                        )
@@ -994,7 +994,7 @@ val_compdf.groupby("bbox_area_bin_label").size()
 
 train_test_drift_cls = DriftStats(reference_distribution=train_df,
                                  comparison_distribution=test_df,
-                                 field_to_bin="bbox_area_norm",
+                                 field_to_bin="relative_bbox_area",
                                 name_bin_field_as="bbox_area_bin",
                                 name_bin_field_label_as="bbox_area_bin_label"
                                  )
@@ -1137,7 +1137,7 @@ distributions = {"train": train_df,
 
 metrics = ["kl", "js"]
 
-field_to_bin = ['bbox_area_norm', 'bbox_aspect_ratio',
+field_to_bin = ['relative_bbox_area', 'bbox_aspect_ratio',
                 'foreground_ratio', 'occupancy_per_image'
                 ]
 
@@ -1224,14 +1224,14 @@ This dataset card summarizes the dataset and the data-centric ML metrics compute
 
 | Metric | Description |
 |--------|-------------|
-| `bbox_area_norm` | Normalized bbox area relative to image area |
+| `relative_bbox_area` | Normalized bbox area relative to image area |
 | `bbox_aspect_ratio` | Width / height |
 | `center_x_norm`, `center_y_norm` | Normalized bbox center coordinates |
 
 **Summary:**
 
-- Mean bbox area norm: {df["bbox_area_norm"].mean():.4f}
-- Median bbox area norm: {df["bbox_area_norm"].median():.4f}
+- Mean bbox area norm: {df["relative_bbox_area"].mean():.4f}
+- Median bbox area norm: {df["relative_bbox_area"].median():.4f}
 - Mean aspect ratio: {df["bbox_aspect_ratio"].mean():.4f}
 
 ---
@@ -1243,12 +1243,12 @@ This dataset card summarizes the dataset and the data-centric ML metrics compute
 | Metric | Description |
 |--------|-------------|
 | `num_bboxes_per_image` | Number of objects per image |
-| `bbox_area_norm_variance_per_image` | Variance of object sizes within each image |
+| `relative_bbox_area_variance_per_image` | Variance of object sizes within each image |
 
 **Summary:**
 
 - Mean objects per image: {per_image["num_bboxes_per_image"].mean():.2f}
-- Mean bbox size variance: {per_image["bbox_area_norm_variance_per_image"].mean():.4f}
+- Mean bbox size variance: {per_image["relative_bbox_area_variance_per_image"].mean():.4f}
 
 ---
 
@@ -1274,7 +1274,7 @@ This dataset card summarizes the dataset and the data-centric ML metrics compute
 
 ### 4.1 What These Metrics Reveal
 
-- **Scale drift:** via `bbox_area_norm`, `avg_bbox_area_norm`, `bbox_area_norm_variance_per_image`
+- **Scale drift:** via `relative_bbox_area`, `avg_relative_bbox_area`, `relative_bbox_area_variance_per_image`
 - **Composition drift:** via `num_bboxes_per_image`
 - **Scene density drift:** via `occupancy_per_image`
 - **Foreground-background structure:** via `foreground_union_area_per_image`, contrast ratios
