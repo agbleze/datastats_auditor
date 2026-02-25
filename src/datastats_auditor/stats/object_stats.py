@@ -584,13 +584,7 @@ train_summary
 
 train_df.area_bin.isna().sum()
 
-#%%
 
-train_df[train_df["foreground_ratio"] > 1]
-
-#%%
-
-train_summary["difficulty"]["bbox_stats"]["bbox_area_ratio_per_bin"]
 # %%
 
 @dataclass
@@ -1138,7 +1132,9 @@ distributions = {"train": train_df,
 metrics = ["kl", "js"]
 
 field_to_bin = ['relative_bbox_area', 'bbox_aspect_ratio',
-                'foreground_to_background_area_per_image', 
+                'relative_x_center', 'relative_y_center',
+                
+                #'foreground_to_background_area_per_image', 
                 'occupancy_per_image'
                 ]
 
@@ -1182,8 +1178,105 @@ drift_radar_plot = plot_drift_radar(drift_scores=drift_metric,
 
 drift_radar_plot
 
+#%%
+
+train_category_count_df = train_df.groupby("category_name").size().rename("count").reset_index()
+val_category_count_df = val_df.groupby("category_name").size().rename("count").reset_index()
+test_category_count_df = test_df.groupby("category_name").size().rename("count").reset_index()
+#%%
+
+train_obj_count_plot = px.bar(train_category_count_df, x="category_name", y="count",
+                            title="Category Distribution in Train Set",
+                            template="plotly_dark", color="category_name",
+                            color_discrete_sequence=px.colors.qualitative.Plotly,
+                                labels={"category_name": "Category", "count": "Count"},
+                                text="count", 
+                            )
+
+#%%
 
 
+
+train_obj_count_plot.update_layout(showlegend=False, xaxis_tickangle=-45)
+
+
+def plot_bar(df: pd.DataFrame, x="category_name", 
+                               y="count", 
+                               title=None):
+    fig = px.bar(df, x=x, y=y,
+                 title=title if title else "",
+                 template="plotly_dark", color=x,
+                 color_discrete_sequence=px.colors.qualitative.Bold,
+                 #labels={x: "Category", y: "Count"},
+                 text=y
+                 )
+    #fig.update_layout(showlegend=False, xaxis_tickangle=-45)
+    return fig
+
+train_obj_count_plot = plot_bar(train_category_count_df, 
+                               x="category_name", y="count",
+                                )
+                               #title="Category Distribution in Train Set"
+
+val_obj_plot = plot_bar(val_category_count_df, 
+                        x="category_name", y="count",
+                        #title="Category Distribution in Val Set"
+                        )
+test_obj_plot = plot_bar(test_category_count_df, 
+                        x="category_name", y="count",
+                        #title="Category Distribution in Test Set"
+                        )
+#%%
+
+from plotly.subplots import make_subplots
+
+#%%
+
+def make_split_plot(splits: dict):
+    """
+    splits = {
+        "train": train_plot,
+        "val": val_plot,
+        "test": test_plot
+    }
+    """
+    num = len(splits)
+    fig = make_subplots(rows=1, cols=num, 
+                        subplot_titles=[k.capitalize() for k in splits]
+                        )
+
+    col = 1
+    for name, plot in splits.items():
+        for trace in plot.data:
+            fig.add_trace(trace, row=1, col=col)
+        col += 1
+    fig.update_xaxes(automargin=False)
+    fig.update_yaxes(automargin=False)
+    fig.update_traces(textangle=-90, cliponaxis=False)
+    fig.update_layout(height=400, width=300*num, showlegend=False,
+                      margin=dict(l=30, r=20, t=20),
+                      template="plotly_dark",
+                      uniformtext_minsize=10,
+                      uniformtext_mode="show"
+                      )
+    return fig
+
+
+#%%
+splits_obj_barplots = {
+        "Train  Set": train_obj_count_plot,
+        "Val  Set": val_obj_plot,
+        "Test  Set": test_obj_plot
+    }
+
+
+#%%
+
+split_bar_plot = make_split_plot(splits_obj_barplots)
+
+#%%
+
+split_bar_plot
 #%%
 import pandas as pd
 from datetime import datetime
