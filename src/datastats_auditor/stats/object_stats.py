@@ -835,6 +835,9 @@ split_drift_res = split_stats_cls.compute_drift()
 
 
 #%%
+
+split_stats_res['split_dfs']
+#%%
 pd.concat([train_df["relative_bbox_area"], val_df["relative_bbox_area"]])
 
 
@@ -952,7 +955,35 @@ class DriftStats:
 
 train_df.columns 
 
-val_df.columns   
+val_df.columns  
+
+#%%
+
+train_df["split_type"] = "train"
+val_df["split_type"] = "val"
+test_df["split_type"] = "test"
+
+
+#%%
+
+full_split_df = pd.concat([train_df, val_df, test_df], ignore_index=True)
+
+
+#%%
+
+px.histogram(full_split_df, x="relative_bbox_area", 
+             histnorm="probability",
+             #marginal="box",
+            #nbins=50, 
+             title="Distribution of Relative BBox Area by Split",
+                template="plotly_dark",
+            color="category_name",
+                #facet_col="split_type",
+                facet_row="split_type",
+                facet_col_spacing=0.1,
+                height=800,
+                width=800,
+             )
 #%%
 
 
