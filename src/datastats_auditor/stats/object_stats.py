@@ -1124,6 +1124,7 @@ def plot_drift_radar(drift_scores: List[float],
 #%%
 train_df.columns
 
+#%%
 distributions = {"train": train_df,
                  "val": val_df,
                  "test": test_df
@@ -1133,9 +1134,13 @@ metrics = ["kl", "js"]
 
 field_to_bin = ['relative_bbox_area', 'bbox_aspect_ratio',
                 'relative_x_center', 'relative_y_center',
-                
+                'foreground_union_area_per_image',
+                'occupancy_per_image', 'background_area_per_image',
                 #'foreground_to_background_area_per_image', 
-                'occupancy_per_image'
+                'background_area_norm',
+                #'foreground_occupancy_to_background_occupany', 
+                'num_bboxes_per_image',
+                'relative_bbox_area_variance_per_image'
                 ]
 
 #%%
@@ -1230,9 +1235,32 @@ test_obj_plot = plot_bar(test_category_count_df,
 
 from plotly.subplots import make_subplots
 
+
 #%%
 
-def make_split_plot(splits: dict):
+import itertools
+
+#%%
+
+def get_subplot_indices(nrows, ncols):
+    return list(itertools.product(range(1, nrows+1),
+                                  range(1, ncols+1)
+                                  )
+                )
+    
+    
+    
+# list(itertools.product(range(1, 2), range(1, 3), #repeat=2
+#                        )
+#      )
+
+
+#%%
+
+get_subplot_indices(1, 3)
+#%%
+
+def make_split_plot(splits: dict, **kwargs):
     """
     splits = {
         "train": train_plot,
@@ -1241,23 +1269,31 @@ def make_split_plot(splits: dict):
     }
     """
     num = len(splits)
-    fig = make_subplots(rows=1, cols=num, 
+    nrows = kwargs.get("rows", 1)
+    ncols = kwargs.get("cols", num)
+    
+    subplot_indices = get_subplot_indices(nrows, ncols)
+    
+    fig = make_subplots(rows=nrows, cols=ncols, 
                         subplot_titles=[k.capitalize() for k in splits]
                         )
 
     col = 1
-    for name, plot in splits.items():
+    for (row, col), (name, plot) in zip(subplot_indices, splits.items()):
         for trace in plot.data:
-            fig.add_trace(trace, row=1, col=col)
-        col += 1
+            fig.add_trace(trace, row=row, col=col)
     fig.update_xaxes(automargin=False)
     fig.update_yaxes(automargin=False)
-    fig.update_traces(textangle=-90, cliponaxis=False)
-    fig.update_layout(height=400, width=300*num, showlegend=False,
-                      margin=dict(l=30, r=20, t=20),
-                      template="plotly_dark",
-                      uniformtext_minsize=10,
-                      uniformtext_mode="show"
+    fig.update_traces(textangle=kwargs.get("textangle", -90), 
+                      cliponaxis=kwargs.get("cliponaxis", False)
+                      )
+    fig.update_layout(height=kwargs.get("height", 400), 
+                      width=kwargs.get("width", 300*num), 
+                      showlegend=kwargs.get("showlegend", False),
+                      margin=kwargs.get("margin", dict(l=30, r=20, t=20)),
+                      template=kwargs.get("template", "plotly_dark"),
+                      uniformtext_minsize=kwargs.get("uniformtext_minsize", 10),
+                      uniformtext_mode=kwargs.get("uniformtext_mode", "show")
                       )
     return fig
 
@@ -1272,7 +1308,9 @@ splits_obj_barplots = {
 
 #%%
 
-split_bar_plot = make_split_plot(splits_obj_barplots)
+split_bar_plot = make_split_plot(splits_obj_barplots, rows=3,
+                                 cols=1
+                                 )
 
 #%%
 
