@@ -975,7 +975,7 @@ px.histogram(full_split_df, x="relative_bbox_area",
              histnorm="probability",
              title="Distribution of Relative BBox Area by Split",
                 template="plotly_dark",
-            color="category_name",
+                color="category_name",
                 facet_row="split_type",
                 facet_col_spacing=0.1,
                 height=800,
@@ -1233,9 +1233,12 @@ train_obj_count_plot = px.bar(train_category_count_df, x="category_name", y="cou
 train_obj_count_plot.update_layout(showlegend=False, xaxis_tickangle=-45)
 
 
-def plot_bar(df: pd.DataFrame, x="category_name", 
-                               y="count", 
-                               title=None):
+def plot_bar(df: pd.DataFrame, 
+             x="category_name", 
+            y="count", 
+            title=None,
+            **kwargs
+            ):
     fig = px.bar(df, x=x, y=y,
                  title=title if title else "",
                  template="plotly_dark", color=x,
