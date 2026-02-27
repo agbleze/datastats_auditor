@@ -1244,7 +1244,11 @@ def plot_bar(df: pd.DataFrame,
                  template="plotly_dark", color=x,
                  color_discrete_sequence=px.colors.qualitative.Bold,
                  #labels={x: "Category", y: "Count"},
-                 text=y
+                 text=y,
+                 facet_row=kwargs.get("facet_row"),
+                 facet_col=kwargs.get("facet_col"),
+                 facet_row_spacing=kwargs.get("facet_row_spacing", 0.02),
+                 facet_col_spacing=kwargs.get("facet_col_spacing", 0.02),
                  )
     #fig.update_layout(showlegend=False, xaxis_tickangle=-45)
     return fig
