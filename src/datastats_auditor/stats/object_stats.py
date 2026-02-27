@@ -973,12 +973,9 @@ full_split_df = pd.concat([train_df, val_df, test_df], ignore_index=True)
 
 px.histogram(full_split_df, x="relative_bbox_area", 
              histnorm="probability",
-             #marginal="box",
-            #nbins=50, 
              title="Distribution of Relative BBox Area by Split",
                 template="plotly_dark",
             color="category_name",
-                #facet_col="split_type",
                 facet_row="split_type",
                 facet_col_spacing=0.1,
                 height=800,
