@@ -12,6 +12,7 @@ from typing import Dict, Union, List, Optional
 from datastats_auditor.stats.image_stats import ImageBatchDataset
 from datastats_auditor.stats.image_stats import compute_dataset_stats, estimate_image_memory_size_GB, get_memory_info
 from itertools import combinations
+from seaborn import heatmap
 from shapely.geometry import box
 from shapely.ops import unary_union
 import plotly.express as px
@@ -183,8 +184,8 @@ class ObjectStats:
         self.df["bbox_aspect_ratio"] = self.df["bbox_w"] / self.df["bbox_h"]
 
         # compute object center coordinates
-        self.df["center_x"] = (self.df["bbox_x"] + self.df["bbox_w"]) / 2
-        self.df["center_y"] = (self.df["bbox_y"] + self.df["bbox_h"]) / 2
+        self.df["center_x"] = self.df["bbox_x"] + self.df["bbox_w"] / 2
+        self.df["center_y"] = self.df["bbox_y"] + self.df["bbox_h"] / 2
 
         # normalize
         self.df["relative_x_center"] = self.df["center_x"] / self.df["image_width"]
@@ -380,10 +381,16 @@ class ObjectStats:
                                                  self.df["relative_y_center"], 
                                                  bins=bins, range=[[0, 1], [0, 1]]
                                                  )
+        heatmap_proba = heatmap / heatmap.sum()
+        px = heatmap_proba.sum(axis=1)
+        py = heatmap_proba.sum(axis=0)
         res = {
             "heatmap": heatmap,
             "xedges": xedges,
-            "yedges": yedges
+            "yedges": yedges,
+            "heatmap_proba": heatmap_proba,
+            "px": px,
+            "py": py
         }
         return res
     
@@ -1236,19 +1243,37 @@ train_obj_count_plot.update_layout(showlegend=False, xaxis_tickangle=-45)
 def plot_bar(df: pd.DataFrame, 
              x="category_name", 
             y="count", 
-            title=None,
             **kwargs
             ):
+    """
+    
+    kwargs:
+        title
+        template
+        color_discrete_sequence
+        labels
+        facet_row
+        facet_col
+        facet_row_spacing
+        facet_col_spacing
+        barmode
+        height
+        width
+    """
     fig = px.bar(df, x=x, y=y,
-                 title=title if title else "",
-                 template="plotly_dark", color=x,
-                 color_discrete_sequence=px.colors.qualitative.Bold,
-                 #labels={x: "Category", y: "Count"},
+                 title=kwargs.get("title"),
+                 template=kwargs.get("template", "plotly_dark"), 
+                 color=x,
+                 color_discrete_sequence=kwargs.get("color_discrete_sequence", px.colors.qualitative.Bold),
+                 labels=kwargs.get("labels", {x: "Category", y: "Count"}),
                  text=y,
                  facet_row=kwargs.get("facet_row"),
                  facet_col=kwargs.get("facet_col"),
                  facet_row_spacing=kwargs.get("facet_row_spacing", 0.02),
                  facet_col_spacing=kwargs.get("facet_col_spacing", 0.02),
+                 barmode=kwargs.get("barmode", "relative"),
+                 height=kwargs.get("height"),
+                 width=kwargs.get("width")
                  )
     #fig.update_layout(showlegend=False, xaxis_tickangle=-45)
     return fig
@@ -1266,6 +1291,20 @@ test_obj_plot = plot_bar(test_category_count_df,
                         x="category_name", y="count",
                         #title="Category Distribution in Test Set"
                         )
+
+
+#%%
+
+plot_bar(full_split_df.groupby(["split_type", "category_name"]).size().reset_index(name="count"),
+         x="category_name", y="count",
+         title="Category Distribution by Split",
+         facet_row="split_type",
+         color="split_type",
+         color_discrete_sequence=px.colors.qualitative.Plotly,
+         labels={"category_name": "Category", "count": "Count", "split_type": "Split"},
+         text="count",
+         
+         )#.update_layout(showlegend=False, xaxis_tickangle=-45)
 #%%
 
 from plotly.subplots import make_subplots
@@ -1350,6 +1389,44 @@ split_bar_plot = make_split_plot(splits_obj_barplots, rows=3,
 #%%
 
 split_bar_plot
+
+#%%
+
+import numpy as np 
+from scipy.spatial.distance import jensenshannon 
+from scipy.stats import wasserstein_distance, wasserstein_distance_nd
+
+#%%
+
+heatmap, xedges, yedges = np.histogram2d(train_df["relative_x_center"],
+                                         train_df["relative_y_center"],
+                                         #bins=10,
+                                         range=[[0, 1], [0, 1]],
+                                         )
+
+#%%
+
+heatmap#.shape
+
+#%%
+
+xedges.shape
+
+#%%
+
+yedges
+
+#%%
+
+(heatmap / heatmap.sum()).sum(axis=1)#.shape
+
+#%%
+train_df["relative_x_center"].min(), train_df["relative_x_center"].max()
+
+#%%
+train_df["relative_y_center"].min(), train_df["relative_y_center"].max()
+
+
 #%%
 import pandas as pd
 from datetime import datetime
@@ -1485,3 +1562,81 @@ create_dataset_card(train_df)
 js_divergence_between_distributions(train_df, val_df, field_name="area_bin_label", 
                                     labels=train_objstats.area_bin_labels)
 
+
+
+
+"""
+
+# Bias and Unbalance Analysis
+Bar plots facet / subplot color by category_name to visualize class distribution differences across splits.
+
+object count distribution by split
+counts
+ 
+
+Histogram stack plot of object-level metrics (e.g., bbox area, aspect ratio) by split to visualize distributional differences.
+Split specific distribution 
+color=category_name
+barmode="stack"
+probability | count
+--- 'bbox_area', 'relative_bbox_area',
+       'bbox_aspect_ratio', 'center_x', 'center_y', 'relative_x_center',
+       'relative_y_center', 'foreground_union_area_per_image',
+       'occupancy_per_image', 'background_area_per_image',
+       'foreground_to_background_area_per_image', 'background_area_norm',
+       'foreground_occupancy_to_background_occupany', 'num_bboxes_per_image',
+       'relative_bbox_area_variance_per_image',
+       
+
+Spatial distribution heatmaps of object locations (e.g., center_x, center_y) by split to visualize spatial biases or shifts.
+       
+Histogram 2d 
+-- 'relative_x_center',
+    'relative_y_center'
+       
+       
+       
+Drift metrics (e.g., KL divergence, JS divergence) computed on binned versions of object-level metrics to quantify distributional shifts across splits.
+Radar plots of drift metrics by property to visualize which properties exhibit the most shift.
+
+Comaprison on Train vs Val, Train vs Test, Val vs Test
+--  'bbox_area', 'relative_bbox_area',
+    'bbox_aspect_ratio', 'center_x', 'center_y', 'relative_x_center',
+    'relative_y_center', 'foreground_union_area_per_image',
+    'occupancy_per_image', 'background_area_per_image',
+    'foreground_to_background_area_per_image', 'background_area_norm',
+    'foreground_occupancy_to_background_occupany', 'num_bboxes_per_image',
+    'relative_bbox_area_variance_per_image',
+
+
+
+
+
+
+Index(['id_annotation', 'image_id', 'category_id', 'bbox', 'area',
+       'segmentation', 'iscrowd', 'file_name', 'image_height', 'image_width',
+       'category_name', 'supercategory', 'bbox_x', 'bbox_y', 'bbox_w',
+       'bbox_h', 'image_area', 
+       
+       'bbox_area', 'relative_bbox_area',
+       'bbox_aspect_ratio', 'center_x', 'center_y', 'relative_x_center',
+       'relative_y_center', 'foreground_union_area_per_image',
+       'occupancy_per_image', 'background_area_per_image',
+       'foreground_to_background_area_per_image', 'background_area_norm',
+       'foreground_occupancy_to_background_occupany', 'num_bboxes_per_image',
+       'relative_bbox_area_variance_per_image', 'area_bin', 'area_bin_label',
+       'bbox_area_bin', 'bbox_area_bin_label', 'relative_bbox_area_bin',
+       'relative_bbox_area_bin_label', 'bbox_aspect_ratio_bin',
+       'bbox_aspect_ratio_bin_label', 'relative_x_center_bin',
+       'relative_x_center_bin_label', 'relative_y_center_bin',
+       'relative_y_center_bin_label', 'foreground_union_area_per_image_bin',
+       'foreground_union_area_per_image_bin_label', 'occupancy_per_image_bin',
+       'occupancy_per_image_bin_label', 'background_area_per_image_bin',
+       'background_area_per_image_bin_label', 'background_area_norm_bin',
+       'background_area_norm_bin_label', 'num_bboxes_per_image_bin',
+       'num_bboxes_per_image_bin_label',
+       'relative_bbox_area_variance_per_image_bin',
+       'relative_bbox_area_variance_per_image_bin_label', 'split_type'],
+      dtype='object')
+
+"""
