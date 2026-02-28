@@ -12,10 +12,13 @@ from typing import Dict, Union, List, Optional
 from datastats_auditor.stats.image_stats import ImageBatchDataset
 from datastats_auditor.stats.image_stats import compute_dataset_stats, estimate_image_memory_size_GB, get_memory_info
 from itertools import combinations
-from seaborn import heatmap
+#from seaborn import heatmap
 from shapely.geometry import box
 from shapely.ops import unary_union
 import plotly.express as px
+from scipy.spatial.distance import jensenshannon
+from scipy.stats import wasserstein_distance, wasserstein_distance_nd
+
 
 #%%
 
@@ -71,6 +74,54 @@ def compute_foreground_area_union(df):
     )
 
     return df.merge(ratios, on="image_id")
+
+
+
+def compute_spatial_drift(spatial_A, spatial_B,
+                            xy_colname="heatmap",
+                            x_colname="px",
+                            y_colname="py",
+                            ):
+        H_A, H_B = spatial_A[xy_colname], spatial_B[xy_colname]
+        px_A, px_B = spatial_A[x_colname], spatial_B[x_colname]
+        py_A, py_B = spatial_A[y_colname], spatial_B[y_colname]
+
+        # 2D JS divergence
+        js_2d = jensenshannon(H_A.ravel(), H_B.ravel())**2
+
+        # 1D JS on marginals
+        js_x = jensenshannon(px_A, px_B)**2
+        js_y = jensenshannon(py_A, py_B)**2
+
+        # 1D Wasserstein
+        bins_1d = np.linspace(0, 1, len(px_A))
+        w1_x = wasserstein_distance(bins_1d, bins_1d, px_A, px_B)
+        w1_y = wasserstein_distance(bins_1d, bins_1d, py_A, py_B)
+
+        # 2D Wasserstein
+        x_centers = 0.5 * (spatial_A["xedges"][:-1] + spatial_A["xedges"][1:])
+        y_centers = 0.5 * (spatial_A["yedges"][:-1] + spatial_A["yedges"][1:])
+        X, Y = np.meshgrid(x_centers, y_centers, indexing="ij")
+        support = np.stack([X.ravel(), Y.ravel()], axis=1)
+
+        w1_2d = wasserstein_distance_nd(
+            support,
+            support,
+            u_weights=H_A.ravel(),
+            v_weights=H_B.ravel(),
+        )
+
+        combined = js_2d + 0.5*(js_x + js_y) + 0.5*(w1_x + w1_y) + w1_2d
+
+        return {"js_2d": js_2d,
+                "js_x": js_x,
+                "js_y": js_y,
+                "w1_x": w1_x,
+                "w1_y": w1_y,
+                "w1_2d": w1_2d,
+                "combined_score": combined,
+                }
+
 
 #%%    
 
@@ -831,7 +882,6 @@ split_stats_res["object_stats"].test
 
 #%%
 
-sorted(set([df["area_bin_label"].dropna().values for nm, df in split_stats_res["split_dfs"].items()]))
 
 #%%
 
@@ -865,8 +915,11 @@ class DriftStats:
             include_overflow_bin
             n_bins
             metric
+            x_coordinate_field
+            y_coordinate_field
         
         """
+        self.kwargs = kwargs
         self.reference_distribution = reference_distribution
         self.comparison_distribution = comparison_distribution
         self.bins = bins
@@ -957,6 +1010,102 @@ class DriftStats:
                                                                  )
             
         return divergence_res
+    
+    
+    def compute_spatial_distribution(self, df,
+                                    x_col="relative_x_center", 
+                                    y_col="relative_y_center",
+                                    **kwargs
+                                    ):
+        x_col = self.kwargs.get("x_coordinate_field", x_col)
+        y_col = self.kwargs.get("y_coordinate_field", y_col)
+        x_bins = self.compute_bins(field_to_bin=self.kwargs.get("x_coordinate_field", x_col))
+        y_bins = self.compute_bins(field_to_bin=self.kwargs.get("y_coordinate_field", y_col))
+    
+        heatmap, xedges, yedges = np.histogram2d(df[x_col],
+                                                df[y_col],
+                                                bins=[x_bins, y_bins],
+                                                range=kwargs.get("range", [[0, 1], [0, 1]])
+                                            )
+
+        heatmap = heatmap.astype(float)
+        total = heatmap.sum()
+        if total > 0:
+            heatmap /= total
+
+        px = heatmap.sum(axis=1)
+        py = heatmap.sum(axis=0)
+
+        return {"heatmap": heatmap,
+                "px": px,
+                "py": py,
+                "xedges": xedges,
+                "yedges": yedges,
+            }     
+        
+    @classmethod
+    def get_spatial_drift(self, spatial_A, 
+                          spatial_B,
+                            xy_colname="heatmap",
+                            x_colname="px",
+                            y_colname="py"
+                            ):
+        #print(f"spatial_A.keys(): {spatial_A.keys()}")
+        return compute_spatial_drift(spatial_A, spatial_B,
+                                    xy_colname=xy_colname,
+                                    x_colname=x_colname,
+                                    y_colname=y_colname
+                                    )
+    
+    
+    # def compute_spatial_drift(spatial_A, spatial_B,
+    #                         xy_colname="heatmap",
+    #                         x_colname="px",
+    #                         y_colname="py",
+    #                         ):
+    #     H_A, H_B = spatial_A[xy_colname], spatial_B[xy_colname]
+    #     px_A, px_B = spatial_A[x_colname], spatial_B[x_colname]
+    #     py_A, py_B = spatial_A[y_colname], spatial_B[y_colname]
+
+    #     # 2D JS divergence
+    #     js_2d = jensenshannon(H_A.ravel(), H_B.ravel())**2
+
+    #     # 1D JS on marginals
+    #     js_x = jensenshannon(px_A, px_B)**2
+    #     js_y = jensenshannon(py_A, py_B)**2
+
+    #     # 1D Wasserstein
+    #     bins_1d = np.linspace(0, 1, len(px_A))
+    #     w1_x = wasserstein_distance(bins_1d, bins_1d, px_A, px_B)
+    #     w1_y = wasserstein_distance(bins_1d, bins_1d, py_A, py_B)
+
+    #     # 2D Wasserstein
+    #     x_centers = 0.5 * (spatial_A["xedges"][:-1] + spatial_A["xedges"][1:])
+    #     y_centers = 0.5 * (spatial_A["yedges"][:-1] + spatial_A["yedges"][1:])
+    #     X, Y = np.meshgrid(x_centers, y_centers, indexing="ij")
+    #     support = np.stack([X.ravel(), Y.ravel()], axis=1)
+
+    #     w1_2d = wasserstein_distance_nd(
+    #         support,
+    #         support,
+    #         u_weights=H_A.ravel(),
+    #         v_weights=H_B.ravel(),
+    #     )
+
+    #     combined = js_2d + 0.5*(js_x + js_y) + 0.5*(w1_x + w1_y) + w1_2d
+
+    #     return {
+    #             "js_2d": js_2d,
+    #             "js_x": js_x,
+    #             "js_y": js_y,
+    #             "w1_x": w1_x,
+    #             "w1_y": w1_y,
+    #             "w1_2d": w1_2d,
+    #             "combined_score": combined,
+    #         }
+
+
+
 
 #%%
 
@@ -1095,14 +1244,27 @@ class DriftMetricSuite:
                 field_to_bin: Union[str, List[str]],
                 **kwargs
                 ):
+        """
         
+        kwargs:
+            "strategy"
+            "n_bins"
+            "bins"
+            "include_overflow_bin"
+            "compute_spatial_drift": bool
+            "x_coordinate_field"
+            "y_coordinate_field"
+            
+            
+        """
+        self.kwargs = kwargs
         self.distributions = distributions
         self.metrics = metrics
         self.distribution_pairs = list(combinations(distributions.keys(), 2))
-        self.strategy = kwargs.get("strategy", "quantile")
-        self.n_bins = kwargs.get("n_bins", 5)
-        self.bins = kwargs.get("bins")
-        self.include_overflow_bin = kwargs.get("include_overflow_bin", False)
+        self.strategy = self.kwargs.get("strategy", "quantile")
+        self.n_bins = self.kwargs.get("n_bins", 5)
+        self.bins = self.kwargs.get("bins")
+        self.include_overflow_bin = self.kwargs.get("include_overflow_bin", False)
         
         for i in [field_to_bin, metrics]:
             if not isinstance(i, (str, list)):
@@ -1119,11 +1281,36 @@ class DriftMetricSuite:
             
     def drift_metrics(self):
         self.drift_results = {}
+        self.spatial_drift_result = {}
+        spatial_distr = {}
+        
         for pair in self.distribution_pairs:
             ref, comp = pair
             ref_df = self.distributions[ref]
             comp_df = self.distributions[comp]
             
+            if self.kwargs.get("compute_spatial_drift", False):
+                x_coordinate_field = self.kwargs.get("x_coordinate_field")
+                y_coordinate_field = self.kwargs.get("y_coordinate_field")
+                
+                spatial_drift = DriftStats(reference_distribution=ref_df,
+                                            comparison_distribution=comp_df,
+                                            field_to_bin=None,
+                                            name_bin_field_as=self.kwargs.get("spatial_name_bin_field_as"),
+                                            name_bin_field_label_as=self.kwargs.get("spatial_name_bin_field_label_as"),
+                                            strategy=self.kwargs.get("spatial_strategy", self.strategy),
+                                            )
+                for match in pair:
+                    distr = spatial_drift.compute_spatial_distribution(df=self.distributions[match],
+                                                            x_col=x_coordinate_field,
+                                                            y_col=y_coordinate_field
+                                                            )
+                    spatial_distr[match] = distr
+                #print(f"spatial_distr: {spatial_distr}")
+                self.spatial_drift_result[pair] = DriftStats.get_spatial_drift(spatial_distr[pair[0]],
+                                                                                spatial_distr[pair[1]],
+                                                                                )
+                
             for field in self.field_to_bin:
                 name_bin_field_as = f"{field}_bin"
                 name_bin_field_label_as = f"{name_bin_field_as}_label"
@@ -1142,8 +1329,14 @@ class DriftMetricSuite:
                                                                     "distribution_pair": pair,
                                                                     "property": field
                                                                     }  
-                    
-        return self.drift_results
+        #print(f"spatial_distr[pair[0]]: {spatial_distr[pair[0]]}")
+        #print(f"spatial_distr[pair[1]]: {spatial_distr[pair[1]]}")
+        # self.spatial_drift_result[pair] = DriftStats.get_spatial_drift(spatial_distr[pair[0]],
+        #                                                             spatial_distr[pair[1]],
+        #                                                             )  
+        return {"drift": self.drift_results, 
+                "spatial_drift": self.spatial_drift_result
+                }    
 
 
 def plot_drift_radar(drift_scores: List[float], 
@@ -1181,7 +1374,13 @@ field_to_bin = ['relative_bbox_area', 'bbox_aspect_ratio',
 #%%
 
 drift_suite_cls = DriftMetricSuite(distributions=distributions,
-                                    metrics=metrics, field_to_bin=field_to_bin
+                                    metrics=metrics, field_to_bin=field_to_bin,
+                                    #name_bin_field_as=None,
+                                    #name_bin_field_label_as=None,
+                                    compute_spatial_drift=True,
+                                    x_coordinate_field="relative_x_center",
+                                    y_coordinate_field="relative_y_center",
+                                    spatial_strategy="equal",
                                     )
 
 
@@ -1198,7 +1397,7 @@ drift_results.keys()
 drift_radar_data = {}
 drift_property = []
 drift_metric = []
-for k, v in drift_results.items():
+for k, v in drift_results["drift"].items():
     if k.startswith("('train', 'val')") and k.endswith("js"):
         drift_property.append(v["property"])
         drift_metric.append(v["js"])
@@ -1390,6 +1589,76 @@ split_bar_plot = make_split_plot(splits_obj_barplots, rows=3,
 
 split_bar_plot
 
+
+#%%
+
+def compute_bins(reference_distribution,
+                 comparison_distribution,
+                 n_bins=None, field_to_bin=None, 
+                 
+                    strategy=None,
+                    ):
+        # if strategy is None:
+        #     strategy = self.strategy
+            
+        # if field_to_bin is None:
+        #     field_to_bin = self.field_to_bin
+        # if n_bins is None:
+        #     n_bins = self.n_bins
+        #areas = self.df[field_name]#.clip(1e-9, 1.0)
+        values = pd.concat([reference_distribution[field_to_bin], comparison_distribution[field_to_bin]])
+        max_value = values.max()
+        min_value = values.min()
+        if strategy == "quantile":
+            bins = np.quantile(values, np.linspace(0, 1, n_bins + 1))
+        elif strategy == "equal":
+            bins = np.linspace(min_value, max_value, n_bins +1)
+        elif strategy == "log":
+            min_value = values[values > 0].min()            
+            bins = np.logspace(np.log10(min_value), np.log10(max_value), n_bins + 1)
+        else:
+            raise ValueError(f"strategy must be 'quantile', 'equal', or 'log' and not {strategy}")
+        # if self.include_overflow_bin:
+        #     bins = np.concatenate(([-np.inf], bins, [np.inf]))
+        return bins
+
+# x (0.0078125, 0.9953125)
+# y (0.00859375, 0.98828125)
+#%%
+train_val_xbins = compute_bins(reference_distribution=train_df, 
+                           comparison_distribution=val_df,
+                          field_to_bin="relative_x_center", strategy="equal",
+                          n_bins=10
+                          )
+
+train_val_ybins = compute_bins(reference_distribution=train_df, 
+                           comparison_distribution=val_df,
+                          field_to_bin="relative_y_center", strategy="equal",
+                          n_bins=10
+                          )
+
+
+train_test_xbins = compute_bins(reference_distribution=train_df, 
+                           comparison_distribution=test_df,
+                          field_to_bin="relative_x_center", strategy="equal",
+                          n_bins=10
+                          )
+train_test_ybins = compute_bins(reference_distribution=train_df, 
+                           comparison_distribution=test_df,
+                          field_to_bin="relative_y_center", strategy="equal",
+                          n_bins=10
+                          )
+
+val_test_xbins = compute_bins(reference_distribution=val_df, 
+                           comparison_distribution=test_df,
+                          field_to_bin="relative_x_center", strategy="equal",
+                          n_bins=10
+                          )
+val_test_ybins = compute_bins(reference_distribution=val_df, 
+                           comparison_distribution=test_df,
+                          field_to_bin="relative_y_center", strategy="equal",
+                          n_bins=10
+                          )
 #%%
 
 import numpy as np 
@@ -1398,27 +1667,31 @@ from scipy.stats import wasserstein_distance, wasserstein_distance_nd
 
 #%%
 
-heatmap, xedges, yedges = np.histogram2d(train_df["relative_x_center"],
-                                         train_df["relative_y_center"],
-                                         #bins=10,
-                                         range=[[0, 1], [0, 1]],
-                                         )
+train_heatmap, train_xedges, train_yedges = np.histogram2d(train_df["relative_x_center"],
+                                                            train_df["relative_y_center"],
+                                                            #bins=10,
+                                                            range=[[0, 1], [0, 1]],
+                                                            bins=[train_val_xbins, train_val_ybins], 
+                                                            )
 
 #%%
 
-heatmap#.shape
+train_heatmap #.shape
 
 #%%
 
-xedges.shape
+train_xedges.shape
 
 #%%
 
-yedges
+train_yedges#.shape
 
 #%%
+train_heatmap_proba = train_heatmap / train_heatmap.sum()
+train_heatmap_proba#.sum()#.shape
+#%%
 
-(heatmap / heatmap.sum()).sum(axis=1)#.shape
+(train_heatmap / train_heatmap.sum()).sum(axis=1)#.shape
 
 #%%
 train_df["relative_x_center"].min(), train_df["relative_x_center"].max()
@@ -1427,6 +1700,276 @@ train_df["relative_x_center"].min(), train_df["relative_x_center"].max()
 train_df["relative_y_center"].min(), train_df["relative_y_center"].max()
 
 
+#%%
+
+val_heatmap, val_xedges, val_yedges = np.histogram2d(val_df["relative_x_center"],
+                                         val_df["relative_y_center"],
+                                         #bins=10,
+                                         #range=[[0, 1], [0, 1]],    
+                                    )
+
+#%%
+
+val_heatmap.ravel()
+
+val_heatmap_proba = val_heatmap / val_heatmap.sum()
+
+
+#%%
+
+jensenshannon(train_heatmap_proba.ravel(), val_heatmap_proba.ravel())**2
+
+#%%
+
+x_centers = (train_xedges[:-1] + train_xedges[1:]) * 0.5
+x_centers
+
+#%%
+
+y_centers = (train_yedges[:-1] + train_yedges[1:]) * 0.5
+y_centers
+
+#%%
+
+X, Y =np.meshgrid(x_centers, y_centers, indexing="ij")
+
+#%%
+
+support = np.stack([X.ravel(), Y.ravel()], axis=1)
+support.shape
+#%%
+
+wasserstein_distance_nd(train_xedges, train_yedges,
+                        #support, support, 
+                        u_weights=train_heatmap_proba.ravel(), 
+                        v_weights=val_heatmap_proba.ravel()
+                        )
+
+
+#%%
+import numpy as np
+from scipy.spatial.distance import jensenshannon
+from scipy.stats import wasserstein_distance, wasserstein_distance_nd
+
+def compute_spatial_distribution(df, 
+                                 x_col="relative_x_center", 
+                                 y_col="relative_y_center",
+                                 **kwargs
+                                 ):
+    
+    heatmap, xedges, yedges = np.histogram2d(df[x_col],
+                                            df[y_col],
+                                            bins=kwargs.get("bins", 10),
+                                            range=kwargs.get("range", [[0, 1], [0, 1]])
+                                        )
+
+    heatmap = heatmap.astype(float)
+    total = heatmap.sum()
+    if total > 0:
+        heatmap /= total
+
+    px = heatmap.sum(axis=1)
+    py = heatmap.sum(axis=0)
+
+    return {
+        "heatmap": heatmap,
+        "px": px,
+        "py": py,
+        "xedges": xedges,
+        "yedges": yedges,
+    }
+
+
+def compute_spatial_drift(spatial_A, spatial_B,
+                          xy_colname="heatmap",
+                          x_colname="px",
+                          y_colname="py",
+                          ):
+    H_A, H_B = spatial_A[xy_colname], spatial_B[xy_colname]
+    px_A, px_B = spatial_A[x_colname], spatial_B[x_colname]
+    py_A, py_B = spatial_A[y_colname], spatial_B[y_colname]
+
+    # 2D JS divergence
+    js_2d = jensenshannon(H_A.ravel(), H_B.ravel())**2
+
+    # 1D JS on marginals
+    js_x = jensenshannon(px_A, px_B)**2
+    js_y = jensenshannon(py_A, py_B)**2
+
+    # 1D Wasserstein
+    bins_1d = np.linspace(0, 1, len(px_A))
+    w1_x = wasserstein_distance(bins_1d, bins_1d, px_A, px_B)
+    w1_y = wasserstein_distance(bins_1d, bins_1d, py_A, py_B)
+
+    # 2D Wasserstein
+    x_centers = 0.5 * (spatial_A["xedges"][:-1] + spatial_A["xedges"][1:])
+    y_centers = 0.5 * (spatial_A["yedges"][:-1] + spatial_A["yedges"][1:])
+    X, Y = np.meshgrid(x_centers, y_centers, indexing="ij")
+    support = np.stack([X.ravel(), Y.ravel()], axis=1)
+
+    w1_2d = wasserstein_distance_nd(
+        support,
+        support,
+        u_weights=H_A.ravel(),
+        v_weights=H_B.ravel(),
+    )
+
+    combined = js_2d + 0.5*(js_x + js_y) + 0.5*(w1_x + w1_y) + w1_2d
+
+    return {
+            "js_2d": js_2d,
+            "js_x": js_x,
+            "js_y": js_y,
+            "w1_x": w1_x,
+            "w1_y": w1_y,
+            "w1_2d": w1_2d,
+            "combined_score": combined,
+        }
+
+
+#%%
+
+train_spatial = compute_spatial_distribution(train_df, 
+                                             bins=[train_val_xbins, train_val_ybins]
+                                             )
+val_spatial = compute_spatial_distribution(val_df, 
+                                           bins=[train_val_xbins, train_val_ybins])
+test_spatial = compute_spatial_distribution(test_df, 
+                                            bins=[train_test_xbins, train_test_ybins]
+                                            )
+
+#%%
+train_spatial
+
+#%%
+train_val_spatial_drift = compute_spatial_drift(train_spatial, val_spatial)
+train_val_spatial_drift
+
+#%%
+
+train_test_spatial_drift = compute_spatial_drift(train_spatial, test_spatial)
+train_test_spatial_drift
+
+#%%
+
+val_test_spatial_drift = compute_spatial_drift(val_spatial, test_spatial)
+val_test_spatial_drift
+
+
+
+#%%
+
+import plotly.express as px
+from plotly.subplots import make_subplots
+import plotly.graph_objects as go
+
+def plot_spatial_heatmaps(spatial_dict_A, spatial_dict_B, names=("A", "B")):
+    H_A = spatial_dict_A["heatmap"]
+    H_B = spatial_dict_B["heatmap"]
+
+    fig = make_subplots(
+        rows=1, cols=2,
+        subplot_titles=[f"{names[0]} Heatmap", f"{names[1]} Heatmap"]
+    )
+
+    fig.add_trace(
+        go.Heatmap(z=H_A, colorscale="Viridis"),
+        row=1, col=1
+    )
+    fig.add_trace(
+        go.Heatmap(z=H_B, colorscale="Viridis"),
+        row=1, col=2
+    )
+    
+    annotations = []
+    for i in range(H_A.shape[0]): 
+        for j in range(H_A.shape[1]): 
+            annotations.append( dict( x=j, y=i, xref="x1", yref="y1", 
+                                     text=f"{H_A[i, j]:.3f}", 
+                                     showarrow=False, 
+                                     font=dict( color="white" if H_A[i, j] > H_A.max()/2 else "black", 
+                                               size=7
+                                               ) 
+                                     ) 
+                               )
+            
+    for i in range(H_B.shape[0]): 
+        for j in range(H_B.shape[1]): 
+            annotations.append( dict( x=j, y=i, xref="x2", yref="y2", text=f"{H_B[i, j]:.3f}", 
+                                     showarrow=False, 
+                                     font=dict( color="white" if H_B[i, j] > H_B.max()/2 else "black", 
+                                               size=7 
+                                               ) 
+                                     ) 
+                               )
+
+    fig.update_layout(
+        height=400,
+        width=900,
+        coloraxis=dict(colorscale="Viridis"),
+        showlegend=False,
+        annotations=annotations,
+        template="plotly_dark"
+    )
+    fig.update_yaxes(autorange="reversed", row=1, col=1) 
+    fig.update_yaxes(autorange="reversed", row=1, col=2)
+
+    return fig
+
+
+#%%
+
+plot_spatial_heatmaps(train_spatial, val_spatial, names=("Train", "Val"))
+
+#%%
+
+plot_spatial_heatmaps(train_spatial, test_spatial, names=("Train Object centers distribution", "Test Object centers distribution"))
+
+#%%
+
+plot_spatial_heatmaps(val_spatial, test_spatial, names=("Val", "Test")) 
+#%%
+
+def compute_quadrant_masses(heatmap):
+    h = heatmap
+    mid = h.shape[0] // 2
+
+    Q1 = h[:mid, :mid].sum()
+    Q2 = h[:mid, mid:].sum()
+    Q3 = h[mid:, :mid].sum()
+    Q4 = h[mid:, mid:].sum()
+
+    return np.array([Q1, Q2, Q3, Q4])
+
+
+def compute_quadrant_drift(spatial_A, spatial_B):
+    qA = compute_quadrant_masses(spatial_A["heatmap"])
+    qB = compute_quadrant_masses(spatial_B["heatmap"])
+
+    # Normalize
+    qA = qA / qA.sum()
+    qB = qB / qB.sum()
+
+    js_quad = jensenshannon(qA, qB)**2
+    l1_quad = np.abs(qA - qB).sum()
+
+    return {
+        "quadrant_A": qA,
+        "quadrant_B": qB,
+        "js_quadrant": js_quad,
+        "l1_quadrant": l1_quad,
+    }
+
+
+#%%
+
+train_val_quadrant_drift = compute_quadrant_drift(train_spatial, val_spatial)
+train_val_quadrant_drift
+
+#%%
+
+train_test_quadrant_drift = compute_quadrant_drift(train_spatial, test_spatial)
+train_test_quadrant_drift
 #%%
 import pandas as pd
 from datetime import datetime
