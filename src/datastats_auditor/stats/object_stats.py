@@ -18,8 +18,8 @@ from shapely.ops import unary_union
 import plotly.express as px
 from scipy.spatial.distance import jensenshannon
 from scipy.stats import wasserstein_distance, wasserstein_distance_nd
-
-
+from plotly.subplots import make_subplots
+import plotly.graph_objects as go
 #%%
 
 VALID_BINNING_STRATEGY = ["quantile", "equal", "log"]
@@ -121,6 +121,61 @@ def compute_spatial_drift(spatial_A, spatial_B,
                 "w1_2d": w1_2d,
                 "combined_score": combined,
                 }
+
+
+def plot_spatial_heatmaps(spatial_dict_A, spatial_dict_B, names=("A", "B")):
+    H_A = spatial_dict_A["heatmap"]
+    H_B = spatial_dict_B["heatmap"]
+
+    fig = make_subplots(
+        rows=1, cols=2,
+        subplot_titles=[f"{names[0]} Heatmap", f"{names[1]} Heatmap"]
+    )
+
+    fig.add_trace(
+        go.Heatmap(z=H_A, colorscale="Viridis"),
+        row=1, col=1
+    )
+    fig.add_trace(
+        go.Heatmap(z=H_B, colorscale="Viridis"),
+        row=1, col=2
+    )
+    
+    annotations = []
+    for i in range(H_A.shape[0]): 
+        for j in range(H_A.shape[1]): 
+            annotations.append( dict( x=j, y=i, xref="x1", yref="y1", 
+                                     text=f"{H_A[i, j]:.3f}", 
+                                     showarrow=False, 
+                                     font=dict( color="white" if H_A[i, j] > H_A.max()/2 else "black", 
+                                               size=7
+                                               ) 
+                                     ) 
+                               )
+            
+    for i in range(H_B.shape[0]): 
+        for j in range(H_B.shape[1]): 
+            annotations.append( dict( x=j, y=i, xref="x2", yref="y2", text=f"{H_B[i, j]:.3f}", 
+                                     showarrow=False, 
+                                     font=dict( color="white" if H_B[i, j] > H_B.max()/2 else "black", 
+                                               size=7 
+                                               ) 
+                                     ) 
+                               )
+
+    fig.update_layout(
+        height=400,
+        width=900,
+        coloraxis=dict(colorscale="Viridis"),
+        showlegend=False,
+        annotations=annotations,
+        template="plotly_dark"
+    )
+    fig.update_yaxes(autorange="reversed", row=1, col=1) 
+    fig.update_yaxes(autorange="reversed", row=1, col=2)
+
+    return fig
+
 
 
 #%%    
@@ -1282,7 +1337,8 @@ class DriftMetricSuite:
     def drift_metrics(self):
         self.drift_results = {}
         self.spatial_drift_result = {}
-        spatial_distr = {}
+        self.spatial_distribution = {}
+        self.spatial_heatmap = {}
         
         for pair in self.distribution_pairs:
             ref, comp = pair
@@ -1299,16 +1355,22 @@ class DriftMetricSuite:
                                             name_bin_field_as=self.kwargs.get("spatial_name_bin_field_as"),
                                             name_bin_field_label_as=self.kwargs.get("spatial_name_bin_field_label_as"),
                                             strategy=self.kwargs.get("spatial_strategy", self.strategy),
+                                            n_bins=self.kwargs.get("spatial_n_bins"),
                                             )
                 for match in pair:
                     distr = spatial_drift.compute_spatial_distribution(df=self.distributions[match],
-                                                            x_col=x_coordinate_field,
-                                                            y_col=y_coordinate_field
-                                                            )
-                    spatial_distr[match] = distr
-                #print(f"spatial_distr: {spatial_distr}")
-                self.spatial_drift_result[pair] = DriftStats.get_spatial_drift(spatial_distr[pair[0]],
-                                                                                spatial_distr[pair[1]],
+                                                                        x_col=x_coordinate_field,
+                                                                        y_col=y_coordinate_field
+                                                                        )
+                    self.spatial_distribution[match] = distr
+                    
+                self.spatial_heatmap[pair] = plot_spatial_heatmaps(spatial_dict_A=self.spatial_distribution[pair[0]],
+                                                                    spatial_dict_B=self.spatial_distribution[pair[1]],
+                                                                    names=pair
+                                                                    )
+                
+                self.spatial_drift_result[pair] = DriftStats.get_spatial_drift(self.spatial_distribution[pair[0]],
+                                                                                self.spatial_distribution[pair[1]],
                                                                                 )
                 
             for field in self.field_to_bin:
@@ -1335,7 +1397,9 @@ class DriftMetricSuite:
         #                                                             spatial_distr[pair[1]],
         #                                                             )  
         return {"drift": self.drift_results, 
-                "spatial_drift": self.spatial_drift_result
+                "spatial_drift": self.spatial_drift_result,
+                "spatial_distribution": self.spatial_distribution,
+                "spatial_heatmap": self.spatial_heatmap
                 }    
 
 
@@ -1381,6 +1445,7 @@ drift_suite_cls = DriftMetricSuite(distributions=distributions,
                                     x_coordinate_field="relative_x_center",
                                     y_coordinate_field="relative_y_center",
                                     spatial_strategy="equal",
+                                    spatial_n_bins=10,
                                     )
 
 
@@ -1389,8 +1454,19 @@ drift_results = drift_suite_cls.drift_metrics()
 
 #%%
 
-drift_results
+drift_results["spatial_heatmap"][('train', 'val')]
 
+#%%
+
+drift_results["spatial_heatmap"][('train', 'test')]
+
+#%%
+
+drift_results["spatial_heatmap"][('val', 'test')]
+
+#%%
+
+drift_results["spatial_drift"]
 
 #%%
 drift_results.keys()
@@ -1858,64 +1934,6 @@ val_test_spatial_drift
 
 
 #%%
-
-import plotly.express as px
-from plotly.subplots import make_subplots
-import plotly.graph_objects as go
-
-def plot_spatial_heatmaps(spatial_dict_A, spatial_dict_B, names=("A", "B")):
-    H_A = spatial_dict_A["heatmap"]
-    H_B = spatial_dict_B["heatmap"]
-
-    fig = make_subplots(
-        rows=1, cols=2,
-        subplot_titles=[f"{names[0]} Heatmap", f"{names[1]} Heatmap"]
-    )
-
-    fig.add_trace(
-        go.Heatmap(z=H_A, colorscale="Viridis"),
-        row=1, col=1
-    )
-    fig.add_trace(
-        go.Heatmap(z=H_B, colorscale="Viridis"),
-        row=1, col=2
-    )
-    
-    annotations = []
-    for i in range(H_A.shape[0]): 
-        for j in range(H_A.shape[1]): 
-            annotations.append( dict( x=j, y=i, xref="x1", yref="y1", 
-                                     text=f"{H_A[i, j]:.3f}", 
-                                     showarrow=False, 
-                                     font=dict( color="white" if H_A[i, j] > H_A.max()/2 else "black", 
-                                               size=7
-                                               ) 
-                                     ) 
-                               )
-            
-    for i in range(H_B.shape[0]): 
-        for j in range(H_B.shape[1]): 
-            annotations.append( dict( x=j, y=i, xref="x2", yref="y2", text=f"{H_B[i, j]:.3f}", 
-                                     showarrow=False, 
-                                     font=dict( color="white" if H_B[i, j] > H_B.max()/2 else "black", 
-                                               size=7 
-                                               ) 
-                                     ) 
-                               )
-
-    fig.update_layout(
-        height=400,
-        width=900,
-        coloraxis=dict(colorscale="Viridis"),
-        showlegend=False,
-        annotations=annotations,
-        template="plotly_dark"
-    )
-    fig.update_yaxes(autorange="reversed", row=1, col=1) 
-    fig.update_yaxes(autorange="reversed", row=1, col=2)
-
-    return fig
-
 
 #%%
 
