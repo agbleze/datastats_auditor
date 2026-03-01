@@ -1512,11 +1512,10 @@ def plot_groupbar(summary_df, x="category_name", **kwargs):
     ))
     fig.add_trace(go.Bar(
         x=summary_df[x],
-        y=summary_df["min"].values,#[19, 14, 22, 14, 16, 19, 15, 14, 10, 12, 12, 16],
+        y=summary_df["min"].values,
         name='Min',
         marker_color='lightsalmon',
         text=summary_df["min"].values,
-        #textposition='auto',
         texttemplate='%{text:.3f}',
         textposition='outside',
         textangle=90,
@@ -1524,33 +1523,28 @@ def plot_groupbar(summary_df, x="category_name", **kwargs):
     ))
     fig.add_trace(go.Bar(
         x=summary_df[x],
-        y=summary_df["mean"].values,#[19, 14, 22, 14, 16, 19, 15, 14, 10, 12, 12, 16],
+        y=summary_df["mean"].values,
         name='Mean',
         text=summary_df["mean"].values,
-        #textposition='auto',
         texttemplate='%{text:.3f}', 
         textposition='outside',
         textangle=90,
         showlegend=kwargs.get("showlegend", False)
-        #marker_color='lightsalmon'
     ))
     fig.add_trace(go.Bar(
-        x=summary_df[x], #.category_name,
-        y=summary_df["std"].values,#[19, 14, 22, 14, 16, 19, 15, 14, 10, 12, 12, 16],
+        x=summary_df[x], 
+        y=summary_df["std"].values,
         name='STD',
         text=summary_df["std"].values,
         textposition='outside',
         texttemplate='%{text:.3f}',
         textangle=90,
         showlegend=kwargs.get("showlegend", False)
-        #marker_color='lightsalmon'
     ))
 
-    # Here we modify the tickangle of the xaxis, resulting in rotated labels.
     fig.update_layout(barmode='group', xaxis_tickangle=-45,
                     uniformtext=dict(mode="show", 
                                     minsize=5,
-                                    #maxsize=7
                                     ),
                     template="plotly_dark",
                     showlegend=kwargs.get("showlegend", False)
