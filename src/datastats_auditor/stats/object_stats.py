@@ -1468,6 +1468,115 @@ drift_results["spatial_heatmap"][('val', 'test')]
 
 drift_results["spatial_drift"]
 
+
+#%%
+
+train_grp_df = train_df.groupby("category_name")["occupancy_per_image"].agg(["mean", "std", "max", "min", "median"]).reset_index()
+
+
+#%%
+
+def compute_stats(df, prop, group="category_name"):
+    return (
+        df.groupby(group)[prop]
+          .agg(["mean", "std", "min", "max", "median"]).reset_index()
+    )
+
+
+train_grp_df = compute_stats(train_df, prop="occupancy_per_image")#.columns
+val_grp_df = compute_stats(val_df, prop="occupancy_per_image")
+test_grp_df = compute_stats(test_df, prop="occupancy_per_image")
+#%%
+
+px.bar(train_grp_df, x="category_name", y='mean', barmode="group",
+       color="")
+
+
+#%%
+
+
+import plotly.graph_objects as go
+
+def plot_groupbar(summary_df, x="category_name", **kwargs):
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        x=summary_df[x],
+        y=summary_df["max"].values,
+        name='Max',
+        marker_color='indianred',
+        text=summary_df["max"].values,
+        textposition='auto',
+        texttemplate='%{text:.3f}',
+        textangle=90,
+        showlegend=kwargs.get("showlegend", False)
+    ))
+    fig.add_trace(go.Bar(
+        x=summary_df[x],
+        y=summary_df["min"].values,#[19, 14, 22, 14, 16, 19, 15, 14, 10, 12, 12, 16],
+        name='Min',
+        marker_color='lightsalmon',
+        text=summary_df["min"].values,
+        #textposition='auto',
+        texttemplate='%{text:.3f}',
+        textposition='outside',
+        textangle=90,
+        showlegend=kwargs.get("showlegend", False),
+    ))
+    fig.add_trace(go.Bar(
+        x=summary_df[x],
+        y=summary_df["mean"].values,#[19, 14, 22, 14, 16, 19, 15, 14, 10, 12, 12, 16],
+        name='Mean',
+        text=summary_df["mean"].values,
+        #textposition='auto',
+        texttemplate='%{text:.3f}', 
+        textposition='outside',
+        textangle=90,
+        showlegend=kwargs.get("showlegend", False)
+        #marker_color='lightsalmon'
+    ))
+    fig.add_trace(go.Bar(
+        x=summary_df[x], #.category_name,
+        y=summary_df["std"].values,#[19, 14, 22, 14, 16, 19, 15, 14, 10, 12, 12, 16],
+        name='STD',
+        text=summary_df["std"].values,
+        textposition='outside',
+        texttemplate='%{text:.3f}',
+        textangle=90,
+        showlegend=kwargs.get("showlegend", False)
+        #marker_color='lightsalmon'
+    ))
+
+    # Here we modify the tickangle of the xaxis, resulting in rotated labels.
+    fig.update_layout(barmode='group', xaxis_tickangle=-45,
+                    uniformtext=dict(mode="show", 
+                                    minsize=5,
+                                    #maxsize=7
+                                    ),
+                    template="plotly_dark",
+                    showlegend=kwargs.get("showlegend", False)
+                    )
+    return fig
+
+
+#%%
+
+train_summary_grp_plot = plot_groupbar(train_grp_df, showlegend=True)
+val_summary_grp_plot = plot_groupbar(val_grp_df, showlegend=False)
+test_summary_grp_plot = plot_groupbar(test_grp_df, showlegend=False)
+#%%
+
+split_grpplot = {"train": train_summary_grp_plot,
+                 "val": val_summary_grp_plot,
+                 "test": test_summary_grp_plot
+                 }
+
+
+#%%
+
+make_split_plot(split_grpplot, rows=3, cols=1,
+                height=700,
+                showlegend=True
+                )
 #%%
 drift_results.keys()
 drift_radar_data = {}
@@ -1480,7 +1589,7 @@ for k, v in drift_results["drift"].items():
     
 #%%
 
-
+train_df.ag
 
 #%%
 
@@ -1638,7 +1747,7 @@ def make_split_plot(splits: dict, **kwargs):
                       )
     fig.update_layout(height=kwargs.get("height", 400), 
                       width=kwargs.get("width", 300*num), 
-                      showlegend=kwargs.get("showlegend", False),
+                      showlegend= kwargs.get("showlegend", False),
                       margin=kwargs.get("margin", dict(l=30, r=20, t=20)),
                       template=kwargs.get("template", "plotly_dark"),
                       uniformtext_minsize=kwargs.get("uniformtext_minsize", 10),
