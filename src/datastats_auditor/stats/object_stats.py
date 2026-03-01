@@ -1101,8 +1101,9 @@ def plot_drift_radar(drift_scores: List[float],
 def compute_stats(df, prop, group="category_name",
                   stats=["mean", "std", "min", "max", "median"]
                   ):
-    
-    return (df.groupby(group)[prop]
+    if group:
+        df = df.groupby(group)
+    return (df[prop]
           .agg(stats).reset_index()
             )
 
