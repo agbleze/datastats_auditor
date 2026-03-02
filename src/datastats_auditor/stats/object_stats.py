@@ -1776,17 +1776,61 @@ if __name__ == "__main__":
 
 
     #%%
-
-    px.histogram(full_split_df, x="relative_bbox_area", 
-                histnorm="probability",
-                title="Distribution of Relative BBox Area by Split",
-                    template="plotly_dark",
-                    color="category_name",
-                    facet_row="split_type",
-                    facet_col_spacing=0.1,
-                    height=800,
-                    width=800,
-                )
+    def plot_histogram(df, **kwargs):
+        fig = px.histogram(df, x=kwargs.get("x"), 
+                            histnorm=kwargs.get("histnorm"), #"probability",
+                            title=kwargs.get("title"), #"Distribution of Relative BBox Area by Split",
+                            template=kwargs.get("template", "plotly_dark"),
+                            color=kwargs.get("color"),
+                            facet_col=kwargs.get("facet_col"),
+                            facet_row=kwargs.get("facet_row"),
+                            facet_col_spacing=kwargs.get("facet_col_spacing", 0.1),
+                            height=kwargs.get("height", 800),
+                            width=kwargs.get("width",800),
+                            barmode=kwargs.get("barmode", "relative"),
+                            
+                            )
+        return fig
+    
+    #%%
+    plot_histogram(df=full_split_df, x="relative_bbox_area",
+                   facet_row="split_type"
+                   )
+    
+    #%%
+    class HistPlot:
+        def __init__(self, df, property_names: Union[str, list], **kwargs):
+            if isinstance(property_names, str):
+                property_names = [property_names]
+            self.property_names = property_names
+            self.kwargs = kwargs
+            self.df = df
+            
+        def create_histograms(self):
+            self.property_histograms = {}
+            for prop in self.property_names:
+                prop_fig = plot_histogram(df=self.df, x=prop,
+                                            **self.kwargs
+                                            )
+                self.property_histograms[prop] = prop_fig
+            return self.property_histograms
+            
+    #%%
+    hist_props = ["relative_bbox_area", 'bbox_aspect_ratio']
+    scene_properties = ['foreground_union_area_per_image',
+                        'occupancy_per_image', 'background_area_per_image',
+                        'foreground_to_background_area_per_image', 'background_area_norm',
+                        'foreground_occupancy_to_background_occupany', 'num_bboxes_per_image',
+                        'relative_bbox_area_variance_per_image',
+                        ]
+    histplot_cls = HistPlot(df=full_split_df, property_names=scene_properties,
+                         #color="category_name", barmode="stack",
+                         facet_row="split_type"
+                         )
+    hist_figs = histplot_cls.create_histograms()
+    #%%
+    hist_figs['relative_bbox_area_variance_per_image']
+    
     #%%
 
 
