@@ -21,6 +21,15 @@ from scipy.stats import wasserstein_distance, wasserstein_distance_nd
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
 from datetime import datetime
+import itertools
+from datastats_auditor.datacard.datacard_generator import (build_motivations_and_use,
+                                                           MarkdownRenderer, 
+                                                           DatasetCardCreator,
+                                                           export_md_to_pdf, create_section,
+                                                           fig_to_base64,
+                                                           generate_dataset_card,
+                                                           
+                                                            ) 
 
 #%%
 
@@ -882,56 +891,79 @@ class DriftStats:
                                     x_colname=x_colname,
                                     y_colname=y_colname
                                     )
+
+class SummaryPlot:
+    def __init__(self, summary_stat_results: dict, **kwargs):
+        self.summary_stat_results = summary_stat_results
+        self.kwargs = kwargs
+        
+    def plot(self):
+        split_nm = list(self.summary_stat_results.keys())
+        property_nms = list(self.summary_stat_results[split_nm[0]].keys())
+        
+        self.prop_subplots = {}
+        for prop in property_nms:
+            split_plots = {}
+            for index, spl in enumerate(split_nm):
+                df = self.summary_stat_results[spl][prop]
+                grpbar = plot_groupbar(summary_df=df, showlegend=index==0)
+                split_plots[f"{spl} {prop}"] = grpbar
+            prop_subplot = make_split_plot(split_plots, rows=self.kwargs.get("rows", 3), 
+                                            cols=self.kwargs.get("cols", 1),
+                                            height=self.kwargs.get("height", 700),
+                                            showlegend=True
+                                            )
+            self.prop_subplots[prop] = prop_subplot
+            
+        return self.prop_subplots
+                
+            
+class HistPlot:
+    def __init__(self, df, property_names: Union[str, list], **kwargs):
+        if isinstance(property_names, str):
+            property_names = [property_names]
+        self.property_names = property_names
+        self.kwargs = kwargs
+        self.df = df
+        
+    def create_histograms(self):
+        self.property_histograms = {}
+        for prop in self.property_names:
+            prop_fig = plot_histogram(df=self.df, x=prop,
+                                        **self.kwargs
+                                        )
+            self.property_histograms[prop] = prop_fig
+        return self.property_histograms
+        
+
+class ObjectSummaryStats:
+    def __init__(self, property_names: Union[str,list],
+                split_dfs: dict[str, pd.DataFrame],
+                groupby_name="category_name",
+                stats = ["mean", "std", "min", "max", "median"]
+                ):
+        if isinstance(property_names, str):
+            property_names = [property_names]
+        self.property_names = property_names
+        self.split_dfs = split_dfs
+        self.stats = stats
+        self.groupby_name = groupby_name
+        
+    def compute_summary_stats(self):
+        self.summary_results = {}
+        
+        for split_name, df in self.split_dfs.items():
+            prop_results = {}
+            for prop in self.property_names:
+                split_prop_stat = compute_stats(df=df, prop=prop, 
+                                                group=self.groupby_name,
+                                                stats=self.stats
+                                                )
+                prop_results[f"{prop}"] = split_prop_stat
+            self.summary_results[split_name] = prop_results
+        return self.summary_results
     
-    
-    # def compute_spatial_drift(spatial_A, spatial_B,
-    #                         xy_colname="heatmap",
-    #                         x_colname="px",
-    #                         y_colname="py",
-    #                         ):
-    #     H_A, H_B = spatial_A[xy_colname], spatial_B[xy_colname]
-    #     px_A, px_B = spatial_A[x_colname], spatial_B[x_colname]
-    #     py_A, py_B = spatial_A[y_colname], spatial_B[y_colname]
-
-    #     # 2D JS divergence
-    #     js_2d = jensenshannon(H_A.ravel(), H_B.ravel())**2
-
-    #     # 1D JS on marginals
-    #     js_x = jensenshannon(px_A, px_B)**2
-    #     js_y = jensenshannon(py_A, py_B)**2
-
-    #     # 1D Wasserstein
-    #     bins_1d = np.linspace(0, 1, len(px_A))
-    #     w1_x = wasserstein_distance(bins_1d, bins_1d, px_A, px_B)
-    #     w1_y = wasserstein_distance(bins_1d, bins_1d, py_A, py_B)
-
-    #     # 2D Wasserstein
-    #     x_centers = 0.5 * (spatial_A["xedges"][:-1] + spatial_A["xedges"][1:])
-    #     y_centers = 0.5 * (spatial_A["yedges"][:-1] + spatial_A["yedges"][1:])
-    #     X, Y = np.meshgrid(x_centers, y_centers, indexing="ij")
-    #     support = np.stack([X.ravel(), Y.ravel()], axis=1)
-
-    #     w1_2d = wasserstein_distance_nd(
-    #         support,
-    #         support,
-    #         u_weights=H_A.ravel(),
-    #         v_weights=H_B.ravel(),
-    #     )
-
-    #     combined = js_2d + 0.5*(js_x + js_y) + 0.5*(w1_x + w1_y) + w1_2d
-
-    #     return {
-    #             "js_2d": js_2d,
-    #             "js_x": js_x,
-    #             "js_y": js_y,
-    #             "w1_x": w1_x,
-    #             "w1_y": w1_y,
-    #             "w1_2d": w1_2d,
-    #             "combined_score": combined,
-    #         }
-
-
-
+                
 class DomainShiftScore:
     def __init__(self, drift_scores: dict,
                  weights: dict = None,
@@ -1796,25 +1828,7 @@ if __name__ == "__main__":
     plot_histogram(df=full_split_df, x="relative_bbox_area",
                    facet_row="split_type"
                    )
-    
-    #%%
-    class HistPlot:
-        def __init__(self, df, property_names: Union[str, list], **kwargs):
-            if isinstance(property_names, str):
-                property_names = [property_names]
-            self.property_names = property_names
-            self.kwargs = kwargs
-            self.df = df
-            
-        def create_histograms(self):
-            self.property_histograms = {}
-            for prop in self.property_names:
-                prop_fig = plot_histogram(df=self.df, x=prop,
-                                            **self.kwargs
-                                            )
-                self.property_histograms[prop] = prop_fig
-            return self.property_histograms
-            
+        
     #%%
     hist_props = ["relative_bbox_area", 'bbox_aspect_ratio']
     scene_properties = ['foreground_union_area_per_image',
@@ -1954,35 +1968,7 @@ if __name__ == "__main__":
     train_grp_df = compute_stats(train_df, prop="occupancy_per_image")#.columns
     val_grp_df = compute_stats(val_df, prop="occupancy_per_image")
     test_grp_df = compute_stats(test_df, prop="occupancy_per_image")
-    
-    #%%
-    
-    class ObjectSummaryStats:
-        def __init__(self, property_names: Union[str,list],
-                    split_dfs: dict[str, pd.DataFrame],
-                    groupby_name="category_name",
-                    stats = ["mean", "std", "min", "max", "median"]
-                    ):
-            if isinstance(property_names, str):
-                property_names = [property_names]
-            self.property_names = property_names
-            self.split_dfs = split_dfs
-            self.stats = stats
-            self.groupby_name = groupby_name
-            
-        def compute_summary_stats(self):
-            self.summary_results = {}
-            
-            for split_name, df in self.split_dfs.items():
-                prop_results = {}
-                for prop in self.property_names:
-                    split_prop_stat = compute_stats(df=df, prop=prop, 
-                                                    group=self.groupby_name,
-                                                    stats=self.stats
-                                                    )
-                    prop_results[f"{prop}"] = split_prop_stat
-                self.summary_results[split_name] = prop_results
-            return self.summary_results
+        
     
     #%%
     
@@ -2015,32 +2001,7 @@ if __name__ == "__main__":
     split_nm = list(summary_stat_res.keys())
     property_nms = list(summary_stat_res[split_nm[0]].keys())
     
-    class SummaryPlot:
-        def __init__(self, summary_stat_results: dict, **kwargs):
-            self.summary_stat_results = summary_stat_results
-            self.kwargs = kwargs
-            
-        def plot(self):
-            split_nm = list(self.summary_stat_results.keys())
-            property_nms = list(self.summary_stat_results[split_nm[0]].keys())
-            
-            self.prop_subplots = {}
-            for prop in property_nms:
-                split_plots = {}
-                for index, spl in enumerate(split_nm):
-                    df = self.summary_stat_results[spl][prop]
-                    grpbar = plot_groupbar(summary_df=df, showlegend=index==0)
-                    split_plots[f"{spl} {prop}"] = grpbar
-                prop_subplot = make_split_plot(split_plots, rows=self.kwargs.get("rows", 3), 
-                                               cols=self.kwargs.get("cols", 1),
-                                                height=self.kwargs.get("height", 700),
-                                                showlegend=True
-                                                )
-                self.prop_subplots[prop] = prop_subplot
-                
-            return self.prop_subplots
-                    
-            
+    
     #%%
     
     summaryplot_cls = SummaryPlot(summary_stat_results=summary_stat_res)   
@@ -2191,8 +2152,11 @@ if __name__ == "__main__":
 
     #%%
 
-    split_bar_plot = make_split_plot(splits_obj_barplots, rows=3,
-                                    cols=1
+    split_bar_plot = make_split_plot(splits_obj_barplots, 
+                                     rows=1,
+                                    cols=3,
+                                    height=700,
+                                    width=1000,
                                     )
 
     #%%
@@ -2394,7 +2358,162 @@ if __name__ == "__main__":
                                         labels=train_objstats.area_bin_labels)
 
 
+    #%%
+    
+    def generate_data_metric_section(metric_heading, fig,
+                                    subheading="", 
+                                    footnote="",
+                                    ):
+        img_b64 = fig_to_base64(fig)
+        img_md = f"![splits](data:image/png;base64,{img_b64})"
 
+        md_content = f"""
+        ## {metric_heading}
+        
+        ### {subheading}
+
+        {img_md}
+
+        
+        {footnote}
+        ---
+        """
+        return md_content
+    
+    #%%
+    generate_data_metric_section()
+    
+    
+    #%%
+    moti_content = build_motivations_and_use(
+        intended_tasks=["Object detection", "Fairness evaluation"],
+        intended_objects=["Person", "Helmet", "Safety vest"],
+    )
+    print(moti_content)
+    # %%
+    motsect = {"Motivation and Intended Use": moti_content}
+
+    mkd_render = MarkdownRenderer()
+
+    cardgen = DatasetCardCreator(sections=motsect, renderer=mkd_render)
+    # %%
+    datacard_md = cardgen.generate()
+    # %%
+    import os
+    os.path.join(Path("output_path.md").stem, ".pdf")
+
+    #%%
+    #f"{Path('name/folder/output_path.md')}"
+    #'name/folder/output_path.md'.split(".md")[0]
+    #%%
+    
+    Path('output_path.md').suffix#.removesuffix("md") + ".pdf"
+    
+
+
+    #%%
+
+    export_md_to_pdf(md=datacard_md)
+    # %%
+    
+
+    # %%
+    import uuid
+
+
+    summary_kwargs = {#"header": "1. Summary",
+                    "Name": "demo data",
+                    "Version ID": str(uuid.uuid1()),
+                    "Modality": "Image",
+                    "Number of images": 1234,
+                    "Number of objects": 5678,
+                    "Objects labeled": ["cocoa", "tomato", "coconut"],
+                    "Object counts per split": {"train": 123, "val": 23, "test": 56}
+                    }
+
+
+    auth_kwargs = {"header": "2. Authorship & Ownership",
+                    "Organization": "ORG",
+                    "Industry": "TECH",
+                    "Dataset owners": "AI TEAM"                   
+                    }
+
+    data_col_kwargs = {"header": "4. Data Collection",
+                        "Collection strategy": "camera recording",
+                        "Devices": "mobile phone",
+                        "Collection Sites": "farm",
+                        "Environmental conditions": "indoor/outdoor, lighting, weather"
+                        }
+
+
+    labelling_kwargs = {"header": "5. Annotation & Labeling",
+                        "Labeling method": "human",
+                        "Label types": "bbox, segmentation mask",
+                        "Annotation format": "COCO",
+                        "Annotation review method": "(SME, same labelers, etc.)",
+                        "Platform": "CVAT"    
+                        }
+
+    licence_kwargs = {"header": "9. Licensing & Usage",
+                    "License": "BSD",
+                    "Usage restrictions": "Internal-only",
+                    "Redistribution policy": "N/A"
+                    }
+
+    trans_kwargs = {"header":"Transformation",
+                    "Technique":"Augmentation",
+                    "Parameters": {},
+
+                    "Libraries used": "Augment" 
+        
+    }
+
+
+    split_kwargs = {"header": "Data Split Composition",
+                    "Algorithm": "similarity‑based splitter",
+                        "Parameters": {"seed":123, "object_based": True, 
+                                    "train_ratio": 0.8
+                                    },
+                        "package": "cluster-aware-spliter"
+                    }
+    
+    
+    #%%
+
+    summary_section = create_section(kwargs=summary_kwargs)
+    authorship_section = create_section(kwargs=auth_kwargs)
+    data_collection_section = create_section(kwargs=data_col_kwargs)
+    labelling_section = create_section(kwargs=labelling_kwargs)
+    split_section = create_section(kwargs=split_kwargs)
+    transformation_section = create_section(kwargs=trans_kwargs)
+    license_section = create_section(kwargs=licence_kwargs)
+
+    # %%
+    sections = {"Authorship & Ownership": authorship_section,
+                "Data Summary": summary_section,            
+                "Motivation and Intended Use": moti_content,
+                "Data Collection": data_collection_section,
+                "Annotation & Labeling": labelling_section,
+                "Data Split Composition": split_section,
+                "Transformation": transformation_section,
+                "License & Usage": license_section
+                        
+                }
+    cardgen = DatasetCardCreator(sections=sections, renderer=mkd_render)
+    # %%
+    card_sections = cardgen.generate()
+
+
+    #%%
+
+    export_md_to_pdf(card_sections, save_path="card_sections.pdf")
+
+    #%%
+    
+
+    
+    
+    #%%
 
     """
 
