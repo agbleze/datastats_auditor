@@ -22,12 +22,13 @@ from plotly.subplots import make_subplots
 import plotly.graph_objects as go
 from datetime import datetime
 import itertools
+import base64
 from datastats_auditor.datacard.datacard_generator import (build_motivations_and_use,
                                                            MarkdownRenderer, 
                                                            DatasetCardCreator,
                                                            export_md_to_pdf, create_section,
                                                            fig_to_base64,
-                                                           generate_dataset_card,
+                                                           #generate_dataset_card,
                                                            
                                                             ) 
 
@@ -134,7 +135,10 @@ def compute_spatial_drift(spatial_A, spatial_B,
                 }
 
 
-def plot_spatial_heatmaps(spatial_dict_A, spatial_dict_B, names=("A", "B")):
+def plot_spatial_heatmaps(spatial_dict_A, spatial_dict_B, 
+                          names=("A", "B"),
+                          **kwargs
+                          ):
     H_A = spatial_dict_A["heatmap"]
     H_B = spatial_dict_B["heatmap"]
 
@@ -147,10 +151,9 @@ def plot_spatial_heatmaps(spatial_dict_A, spatial_dict_B, names=("A", "B")):
         go.Heatmap(z=H_A, colorscale="Viridis"),
         row=1, col=1
     )
-    fig.add_trace(
-        go.Heatmap(z=H_B, colorscale="Viridis"),
-        row=1, col=2
-    )
+    fig.add_trace(go.Heatmap(z=H_B, colorscale="Viridis"),
+                    row=1, col=2
+                    )
     
     annotations = []
     for i in range(H_A.shape[0]): 
@@ -158,7 +161,7 @@ def plot_spatial_heatmaps(spatial_dict_A, spatial_dict_B, names=("A", "B")):
             annotations.append( dict( x=j, y=i, xref="x1", yref="y1", 
                                      text=f"{H_A[i, j]:.3f}", 
                                      showarrow=False, 
-                                     font=dict( color="white" if H_A[i, j] > H_A.max()/2 else "black", 
+                                     font=dict( color="black", #"white" if H_A[i, j] > H_A.max()/2 else "black", 
                                                size=7
                                                ) 
                                      ) 
@@ -168,20 +171,20 @@ def plot_spatial_heatmaps(spatial_dict_A, spatial_dict_B, names=("A", "B")):
         for j in range(H_B.shape[1]): 
             annotations.append( dict( x=j, y=i, xref="x2", yref="y2", text=f"{H_B[i, j]:.3f}", 
                                      showarrow=False, 
-                                     font=dict( color="white" if H_B[i, j] > H_B.max()/2 else "black", 
+                                     font=dict( color="black",#"white" if H_B[i, j] > H_B.max()/2 else "black", 
                                                size=7 
                                                ) 
                                      ) 
                                )
 
-    fig.update_layout(
-        height=400,
-        width=900,
-        coloraxis=dict(colorscale="Viridis"),
-        showlegend=False,
-        annotations=annotations,
-        template="plotly_dark"
-    )
+    fig.update_layout(height=kwargs.get("height", 400),
+                        width=kwargs.get("width", 700),
+                        coloraxis=dict(colorscale="Viridis"),
+                        showlegend=False,
+                        annotations=annotations,
+                        template=kwargs.get("template", "plotly_dark"),
+                        title=kwargs.get("title_text")
+                        )
     fig.update_yaxes(autorange="reversed", row=1, col=1) 
     fig.update_yaxes(autorange="reversed", row=1, col=2)
 
@@ -1118,13 +1121,16 @@ class DriftMetricSuite:
                 }    
 
 
-def plot_drift_radar(drift_scores: List[float], 
-                     drift_properties: List[str],
-                     title=None 
+def plot_drift_radar(drift_df, drift_scores_colname: List[float], 
+                     drift_properties_colname: List[str],
+                     **kwargs
                      ):
-    fig = px.line_polar(r=drift_scores, theta=drift_properties,
-                        template="plotly_dark",
-                        title=title
+    fig = px.line_polar(drift_df,r=drift_scores_colname, 
+                        theta=drift_properties_colname,
+                        template=kwargs.get("template","plotly_dark"),
+                        title=kwargs.get("title"),
+                        width=kwargs.get("width", 700),
+                        height=kwargs.get("height", 500)
                         )
     return fig
   
@@ -1777,7 +1783,6 @@ if __name__ == "__main__":
     [df["area_bin_label"].dropna().values for nm, df in split_stats_res["split_dfs"].items()]
     #%%
 
-    split_drift_res = split_stats_cls.compute_drift()
 
 
     #%%
@@ -1838,8 +1843,10 @@ if __name__ == "__main__":
                         'relative_bbox_area_variance_per_image',
                         ]
     histplot_cls = HistPlot(df=full_split_df, property_names=scene_properties,
-                         #color="category_name", barmode="stack",
-                         facet_row="split_type"
+                         #color="category_name", 
+                         # barmode="stack",
+                         facet_row="split_type",
+                         height=500, width=700,
                          )
     hist_figs = histplot_cls.create_histograms()
     #%%
@@ -2004,7 +2011,10 @@ if __name__ == "__main__":
     
     #%%
     
-    summaryplot_cls = SummaryPlot(summary_stat_results=summary_stat_res)   
+    summaryplot_cls = SummaryPlot(summary_stat_results=summary_stat_res, 
+                                  height=550,
+                                  width=1000,
+                                  )   
     
     #%%
     
@@ -2013,12 +2023,6 @@ if __name__ == "__main__":
     #%%
     summary_subplots['occupancy_per_image']#.keys()  
     
-      
-    #%%
-
-    px.bar(train_grp_df, x="category_name", y='mean', barmode="group",
-        color="")
-
 
     #%%
 
@@ -2049,26 +2053,71 @@ if __name__ == "__main__":
                     showlegend=True
                     )
     #%%
-    drift_results.keys()
-    drift_radar_data = {}
-    drift_property = []
-    drift_metric = []
-    for k, v in drift_results["drift"].items():
-        if k.startswith("('train', 'val')") and k.endswith("js"):
-            drift_property.append(v["property"])
-            drift_metric.append(v["js"])
-        
+    def get_drift_result_as_df(drift_results, 
+                                distribution_pair: str = "('train', 'val')",
+                                property_field_name: str = "property",
+                                metric_name: str = "js"
+                                ):
+        drift_results.keys()
+        #drift_radar_data = {}
+        drift_property = []
+        drift_metric = []
+        for k, v in drift_results["drift"].items():
+            if k.startswith(distribution_pair) and k.endswith(metric_name):
+                drift_property.append(v[property_field_name])
+                drift_metric.append(v[metric_name])
+                
+        drift_dict = {"scores": drift_metric, 
+                      "property": drift_property
+                      }
+        df = pd.DataFrame(drift_dict)
+        return df
+            
+
+    #%%
+    train_val_drift_df = get_drift_result_as_df(drift_results=drift_results,
+                                                distribution_pair="('train', 'val')",
+                                                property_field_name="property",
+                                                metric_name="js",
+                                                )
+    
+    train_test_drift_df = get_drift_result_as_df(drift_results=drift_results,
+                                                distribution_pair="('train', 'test')",
+                                                property_field_name="property",
+                                                metric_name="js",
+                                                )
+    
+    val_test_drift_df = get_drift_result_as_df(drift_results=drift_results,
+                                                distribution_pair="('val', 'test')",
+                                                property_field_name="property",
+                                                metric_name="js",
+                                                )
+    
+    #%%
+    train_val_drift_radar_plot = plot_drift_radar(drift_df=train_val_drift_df,
+                                                drift_properties_colname="property",
+                                                drift_scores_colname="scores",
+                                                title="JS Divergence", height=400,
+                                                width=700
+                                                )
+    
+    train_test_drift_radar_plot = plot_drift_radar(drift_df=train_test_drift_df,
+                                                drift_properties_colname="property",
+                                                drift_scores_colname="scores",
+                                                title="JS Divergence", width=700,
+                                                height=400,
+                                                )
+    
+    val_test_drift_radar_plot = plot_drift_radar(drift_df=val_test_drift_df,
+                                                drift_properties_colname="property",
+                                                drift_scores_colname="scores",
+                                                title="JS Divergence", height=400,
+                                                width=700
+                                                )
 
     #%%
 
-    drift_radar_plot = plot_drift_radar(drift_scores=drift_metric,
-                                        drift_properties=drift_property,
-                                        title="JS Divergence"
-                                        )
-
-    #%%
-
-    drift_radar_plot
+    val_test_drift_radar_plot
 
     #%%
 
@@ -2110,16 +2159,19 @@ if __name__ == "__main__":
 
     #%%
 
-    plot_bar(full_split_df.groupby(["split_type", "category_name"]).size().reset_index(name="count"),
-            x="category_name", y="count",
-            title="Category Distribution by Split",
-            facet_row="split_type",
-            color="split_type",
-            color_discrete_sequence=px.colors.qualitative.Plotly,
-            labels={"category_name": "Category", "count": "Count", "split_type": "Split"},
-            text="count",
-            
-            )#.update_layout(showlegend=False, xaxis_tickangle=-45)
+    object_dist_barplot = plot_bar(full_split_df.groupby(["split_type", "category_name"]).size().reset_index(name="count"),
+                                    x="category_name", y="count",
+                                    title="Category Distribution by Split",
+                                    facet_row="split_type",
+                                    color="split_type",
+                                    color_discrete_sequence=px.colors.qualitative.Plotly,
+                                    labels={"category_name": "Category", "count": "Count", "split_type": "Split"},
+                                    text="count",
+                                    height=500, width=700,
+                                    
+                                    )#.update_layout(showlegend=False, xaxis_tickangle=-45)
+    
+    object_dist_barplot
     #%%
 
     from plotly.subplots import make_subplots
@@ -2164,10 +2216,6 @@ if __name__ == "__main__":
     split_bar_plot
 
 
-    #%%
-
-    # x (0.0078125, 0.9953125)
-    # y (0.00859375, 0.98828125)
     #%%
     train_val_xbins = compute_bins(reference_distribution=train_df, 
                             comparison_distribution=val_df,
@@ -2283,11 +2331,11 @@ if __name__ == "__main__":
     support.shape
     #%%
 
-    wasserstein_distance_nd(train_xedges, train_yedges,
-                            #support, support, 
-                            u_weights=train_heatmap_proba.ravel(), 
-                            v_weights=val_heatmap_proba.ravel()
-                            )
+    # wasserstein_distance_nd(train_xedges, train_yedges,
+    #                         #support, support, 
+    #                         u_weights=train_heatmap_proba.ravel(), 
+    #                         v_weights=val_heatmap_proba.ravel()
+    #                         )
 
 
     #%%
@@ -2327,15 +2375,26 @@ if __name__ == "__main__":
 
     #%%
 
-    plot_spatial_heatmaps(train_spatial, val_spatial, names=("Train", "Val"))
-
+    train_val_heatmap = plot_spatial_heatmaps(train_spatial, val_spatial, 
+                                              names=("Train", "Val"),
+                                             title_text="Probability distribution heatmap for relative object centers"
+                                              
+                                              )
+    train_val_heatmap
     #%%
 
-    plot_spatial_heatmaps(train_spatial, test_spatial, names=("Train Object centers distribution", "Test Object centers distribution"))
-
+    train_test_heatmap = plot_spatial_heatmaps(train_spatial, test_spatial, 
+                                               names=("Train", "Test"),
+                                             title_text="Probability distribution heatmap for relative object centers"
+                                               )
+    train_test_heatmap
     #%%
 
-    plot_spatial_heatmaps(val_spatial, test_spatial, names=("Val", "Test")) 
+    val_test_heatmap = plot_spatial_heatmaps(val_spatial, test_spatial, 
+                                             names=("Val", "Test"),
+                                             title_text="Probability distribution heatmap for relative object centers"
+                                             ) 
+    val_test_heatmap
     #%%
 
     #%%
@@ -2347,7 +2406,7 @@ if __name__ == "__main__":
 
     train_test_quadrant_drift = compute_quadrant_drift(train_spatial, test_spatial)
     train_test_quadrant_drift
-    #%%
+    
 
     #%%
 
@@ -2359,30 +2418,170 @@ if __name__ == "__main__":
 
 
     #%%
+    import base64
     
-    def generate_data_metric_section(metric_heading, fig,
+    def fig_to_base64(fig):
+        img_bytes = fig.to_image(format="png")
+        return base64.b64encode(img_bytes).decode("utf-8")
+        
+    
+    def generate_data_metric_section(metric_heading, 
+                                     fig,
                                     subheading="", 
                                     footnote="",
                                     ):
         img_b64 = fig_to_base64(fig)
         img_md = f"![splits](data:image/png;base64,{img_b64})"
 
-        md_content = f"""
-        ## {metric_heading}
+        md_content = f"""## {metric_heading}
         
-        ### {subheading}
-
-        {img_md}
-
         
-        {footnote}
+### {subheading}
+
+
+{img_md}
+
+
+{footnote}
         ---
         """
         return md_content
     
     #%%
-    generate_data_metric_section()
+    train_val_drift_content = generate_data_metric_section(metric_heading="Data Drift Detection on Data Attributes",
+                                                fig=train_val_drift_radar_plot, #val_test_heatmap, #drift_radar_plot,
+                                                subheading="Jensen Shannon Divergence on Train vs Val Distribution",
+                                                footnote="Score > 0.05 indicates statistically significant drift",
+                                                )
     
+    #%%
+    
+    train_test_drift_content = generate_data_metric_section(metric_heading="",
+                                                fig=train_test_drift_radar_plot, #drift_radar_plot,
+                                                subheading="Jensen Shannon Divergence on Train vs Test Distribution",
+                                                footnote="Score > 0.05 indicates statistically significant drift",
+                                                )
+    
+    
+    #%%
+    
+    val_test_drift_content = generate_data_metric_section(metric_heading="",
+                                                        fig=val_test_drift_radar_plot, #drift_radar_plot,
+                                                        subheading="Jensen Shannon Divergence on Val vs Test Distribution",
+                                                        footnote="Score > 0.05 indicates statistically significant drift",
+                                                        )
+    
+    #%%
+    
+    #%%  heatmap content
+    
+    train_val_spatial_drift_content = generate_data_metric_section(metric_heading=f"Probability Distribution Heatmap of Relative Object Centers", 
+                                                                    fig=train_val_heatmap, 
+                                                                    subheading=f"Train vs Val Object Height and Width Center Distribution - Spatial Drift", 
+                                                                    footnote=f"Jensen Shannon Divergence: {train_val_spatial_drift['js_2d']: .3f} | Wasserstein: {train_val_spatial_drift['w1_2d']: .3f}"  
+                                                                    )
+    
+    train_test_spatial_drift_content = generate_data_metric_section(metric_heading=f"Probability Distribution Heatmap of Relative Object Centers",
+                                                                    fig=train_test_heatmap, 
+                                                                    subheading=f"Train vs Test Object Height and Width Center Distribution - Spatial Drift", 
+                                                                    footnote=f"Jensen Shannon Divergence: {train_test_spatial_drift['js_2d']: .3f} | Wasserstein: {train_test_spatial_drift['w1_2d']: .3f}" 
+                                                                    )
+    
+    val_test_spatial_drift_content = generate_data_metric_section(metric_heading=f"Probability Distribution Heatmap of Relative Object Centers",
+                                                                    fig=val_test_heatmap, 
+                                                                    subheading=f"Val vs Test Object Height and Width Center Distribution - Spatial Drift", 
+                                                                    footnote=f"Jensen Shannon Divergence: {val_test_spatial_drift['js_2d']: .3f} | Wasserstein: {val_test_spatial_drift['w1_2d']: .3f}"  
+                                                                    )
+    
+    #%% Histogram distribution
+    
+    hist_props = ["relative_bbox_area", 'bbox_aspect_ratio']
+    scene_properties = ['foreground_union_area_per_image',
+                        'occupancy_per_image', 'background_area_per_image',
+                        'foreground_to_background_area_per_image', 'background_area_norm',
+                        'foreground_occupancy_to_background_occupany', 'num_bboxes_per_image',
+                        'relative_bbox_area_variance_per_image',
+                        ]
+    all_properties = ["relative_bbox_area", 'bbox_aspect_ratio',
+                      'foreground_union_area_per_image',
+                        'occupancy_per_image', 'background_area_per_image',
+                        'foreground_to_background_area_per_image', 'background_area_norm',
+                        'foreground_occupancy_to_background_occupany', 'num_bboxes_per_image',
+                        'relative_bbox_area_variance_per_image',
+        
+    ]
+    histplot_cls = HistPlot(df=full_split_df, property_names=scene_properties,
+                         #color="category_name", 
+                         # barmode="stack",
+                         facet_row="split_type",
+                         height=500, width=700,
+                         )
+    hist_figs = histplot_cls.create_histograms()
+    
+    #%%
+    
+    obj_hist_cls = HistPlot(df=full_split_df, property_names=hist_props,
+                         color="category_name", 
+                         barmode="stack",
+                         facet_row="split_type",
+                         height=500, width=700,
+                         )
+    obj_hist_figs = obj_hist_cls.create_histograms()
+    
+    #%%
+    hist_figs.update(obj_hist_figs)
+    
+    #%%
+    hist_figs['foreground_union_area_per_image']#.keys()
+    
+    
+    #%%
+    hist_fig_list = []
+    for prop, fig in hist_figs.items():
+        _ = prop if prop in scene_properties else f"{prop} per Object"
+        hist_content = generate_data_metric_section(metric_heading=f"Scene composition: Distribution of {_}",
+                                                    fig=fig,#[prop], 
+                                                    subheading=f"", 
+                                                    footnote=f""  
+                                                    )
+        hist_fig_list.append(hist_content)
+    
+    #%%
+    
+    object_bias_content = generate_data_metric_section(metric_heading=f"Object Balance per Split",
+                                                        fig=object_dist_barplot,
+                                                        )
+    
+    #%%
+    drift_figs = [object_bias_content, train_val_drift_content, train_test_drift_content, val_test_drift_content,
+                    train_val_spatial_drift_content, train_test_spatial_drift_content,
+                    val_test_spatial_drift_content,
+                    ]
+    drift_figs.extend(hist_fig_list)
+    drift_contents = "\n".join([i for i in drift_figs
+                                ]
+                                )
+    
+    
+    drift_contents
+    
+    #%%
+    summary_fig_list = []
+    for prop, fig in summary_subplots.items():
+        sumstat_content = generate_data_metric_section(metric_heading=f"Summary Statistics of {prop}",
+                                                    fig=fig,#[prop], 
+                                                    subheading=f"", 
+                                                    footnote=f""  
+                                                    )
+        summary_fig_list.append(sumstat_content)
+        
+    summary_fig_content = "\n".join([i for i in summary_fig_list])
+    summary_fig_content
+        
+        
+    
+    #%%
+    train_test_spatial_drift
     
     #%%
     moti_content = build_motivations_and_use(
@@ -2395,9 +2594,9 @@ if __name__ == "__main__":
 
     mkd_render = MarkdownRenderer()
 
-    cardgen = DatasetCardCreator(sections=motsect, renderer=mkd_render)
+    #cardgen = DatasetCardCreator(sections=motsect, renderer=mkd_render)
     # %%
-    datacard_md = cardgen.generate()
+    #datacard_md = cardgen.generate()
     # %%
     import os
     os.path.join(Path("output_path.md").stem, ".pdf")
@@ -2413,7 +2612,7 @@ if __name__ == "__main__":
 
     #%%
 
-    export_md_to_pdf(md=datacard_md)
+    #export_md_to_pdf(md=datacard_md)
     # %%
     
 
@@ -2477,6 +2676,7 @@ if __name__ == "__main__":
                         "package": "cluster-aware-spliter"
                     }
     
+    data_metric_kwargs = {"header": "Data Centric Metric"}
     
     #%%
 
@@ -2495,6 +2695,8 @@ if __name__ == "__main__":
                 "Data Collection": data_collection_section,
                 "Annotation & Labeling": labelling_section,
                 "Data Split Composition": split_section,
+                "Data Summary Statistics": summary_fig_content,
+                "Data space metrics": drift_contents,
                 "Transformation": transformation_section,
                 "License & Usage": license_section
                         
@@ -2503,13 +2705,133 @@ if __name__ == "__main__":
     # %%
     card_sections = cardgen.generate()
 
+    #%%
+    
+    
+    
+    #%%
+    
+    from markdown import markdown
+    from weasyprint import HTML
+
+    html = markdown(card_sections, output_format="html5")
+    HTML(string=html).write_pdf("dataset_card_drift.pdf")
 
     #%%
 
     export_md_to_pdf(card_sections, save_path="card_sections.pdf")
 
+    
     #%%
     
+    def generate_dataset_card_with_embedded_plot(
+        fig, #df: pd.DataFrame,
+        md_path="dataset_card.md",
+        pdf_path="dataset_card.pdf"
+    ):
+        # ---------------------------------------------------------
+        # 1. Create Plotly figure
+        # ---------------------------------------------------------
+        # fig = px.histogram(
+        #     df,
+        #     x="bbox_area_norm",
+        #     title="BBox Area Distribution",
+        #     nbins=20
+        # )
+
+        # ---------------------------------------------------------
+        # 2. Convert Plotly figure → base64 PNG (no file saved)
+        # ---------------------------------------------------------
+        img_bytes = fig.to_image(format="png")  # requires kaleido
+        img_b64 = base64.b64encode(img_bytes).decode("utf-8")
+        img_md = f"![plot](data:image/png;base64,{img_b64})"
+
+        # ---------------------------------------------------------
+        # 3. Build Markdown content with embedded image
+        # ---------------------------------------------------------
+        md_content = f"""
+    # Dataset Card
+
+    ## Data-Centric Metrics
+
+    ### BBox Area Distribution
+
+    The histogram below shows the distribution of normalized bounding box areas.
+
+    {img_md}
+
+    """
+
+        # Save Markdown
+        with open(md_path, "w") as f:
+            f.write(md_content)
+
+        # ---------------------------------------------------------
+        # 4. Convert Markdown → HTML
+        # ---------------------------------------------------------
+        html = markdown(md_content, output_format="html5")
+
+        # ---------------------------------------------------------
+        # 5. Convert HTML → PDF
+        # ---------------------------------------------------------
+        HTML(string=html).write_pdf(pdf_path)
+
+        print("Markdown saved:", md_path)
+        print("PDF saved:", pdf_path)
+        return md_content
+
+
+    #%%
+    generate_dataset_card_with_embedded_plot(fig=val_test_heatmap, md_path="spatial_drift.card.md",
+                                             pdf_path="spatial_drift_card.pdf"
+                                             )
+    #%%
+    
+    def generate_dataset_card(md_content, md_path="dataset_card.md", pdf_path="dataset_card.pdf"):
+        #fig = make_split_plot(df_splits)
+        #img_b64 = fig_to_base64(fig)
+        #img_md = f"![splits](data:image/png;base64,{img_b64})"
+
+    #     md_content = f"""
+    # # Dataset Card
+
+    # ## BBox Area Distribution by Split
+
+    # {img_md}
+
+    # ---
+    # """
+
+        with open(md_path, "w") as f:
+            f.write(md_content)
+
+        # Convert Markdown → HTML → PDF (your existing pipeline)
+        from markdown import markdown
+        from weasyprint import HTML
+
+        html = markdown(md_content, output_format="html5")
+        HTML(string=html).write_pdf(pdf_path)
+        
+        return md_content
+
+
+    df_train = pd.DataFrame({"bbox_area_norm": [0.1, 0.2, 0.15, 0.3]})
+    df_val   = pd.DataFrame({"bbox_area_norm": [0.05, 0.12, 0.18]})
+    df_test  = pd.DataFrame({"bbox_area_norm": [0.2, 0.25, 0.22, 0.3]})
+
+    splits = {"train": df_train, "val": df_val, "test": df_test}
+
+    card_md2 = generate_dataset_card(splits)
+
+
+    from fpdf import FPDF
+
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.write_html(card_md2)
+    pdf.output("dataset_card_subplots.pdf")
+
+
 
     
     
