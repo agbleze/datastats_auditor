@@ -2021,9 +2021,68 @@ if __name__ == "__main__":
     summary_subplots = summaryplot_cls.plot() 
     
     #%%
-    summary_subplots['occupancy_per_image']#.keys()  
+    summary_subplots['occupancy_per_image']#.keys() 
     
+    #%%
+    
+    single_summary_stats_cls = ObjectSummaryStats(property_names=property_names, 
+                                           split_dfs=split_stats_res["split_dfs"],
+                                           groupby_name=None
+                                            )
+    #%%
+    
+    single_summary_stat_res = single_summary_stats_cls.compute_summary_stats()
+    
+    
+    #%%
+    
+    single_summary_stat_res['train']['relative_bbox_area_variance_per_image'].set_index("index").T.add_prefix()#.columns#.keys()
+    
+    
+    #%%
+    pd.DataFrame(data=single_summary_stat_res['train']['relative_bbox_area_variance_per_image']['relative_bbox_area_variance_per_image'],#., #.values.tolist(),
+        columns=single_summary_stat_res['train']['relative_bbox_area_variance_per_image']['index'].values.tolist(),
+                 )
 
+    #%%
+    
+    pd.DataFrame([1, 2, 3], columns=["a", "b", "c"])
+    #%%
+    
+    list(single_summary_stat_res['train']['relative_bbox_area_variance_per_image']['relative_bbox_area_variance_per_image'].values) #.tolist()
+    
+    
+    #%%
+    
+    def plot_table(df, cells_colname, header_colname='index', **kwargs):
+        tab_fig = go.Figure(data=[go.Table(
+        header=dict(values=list(df[header_colname].values.tolist()),
+                    fill_color='paleturquoise',
+                    align='left'),
+        cells=dict(values=df[cells_colname].values.tolist(),
+                fill_color=kwargs.get('fill_color', 'lavender'),
+                align=kwargs.get('align','left')
+                ))
+                ])
+        
+        
+        tab_fig.update_layout(title=kwargs.get("title", "Summary Statistics"), 
+                              height=kwargs.get("height", 100), 
+                              width=kwargs.get("width", 550), 
+                              margin=kwargs.get("margin", dict(l=10, r=10, t=40, b=10)), 
+                                template=kwargs.get("template"),
+                                )
+        return tab_fig
+        
+    #%%
+    
+    plot_table(df=single_summary_stat_res['train']['relative_bbox_area_variance_per_image'],
+               cells_colname='relative_bbox_area_variance_per_image'
+               )
+    
+    #%%
+    
+    
     #%%
 
 
@@ -2578,7 +2637,29 @@ if __name__ == "__main__":
     summary_fig_content = "\n".join([i for i in summary_fig_list])
     summary_fig_content
         
-        
+    
+    #%%
+    
+    import plotly.graph_objects as go
+    import pandas as pd
+
+    edf = pd.read_csv('https://raw.githubusercontent.com/plotly/datasets/master/2014_usa_states.csv')
+
+    efig = go.Figure(data=[go.Table(
+        header=dict(values=list(edf.columns),
+                    fill_color='paleturquoise',
+                    align='left'),
+        cells=dict(values=[edf.Rank, edf.State, edf.Postal, edf.Population],
+                fill_color='lavender',
+                align='left'))
+    ])
+
+    efig.show()
+    
+    
+    #%%
+    
+    summary_stat_res
     
     #%%
     train_test_spatial_drift
