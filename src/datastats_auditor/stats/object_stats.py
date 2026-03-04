@@ -2691,11 +2691,11 @@ if __name__ == "__main__":
     summary_content_list = []
     for split_nm in summary_distr_nms:
         for prop in summary_properties:
-            subtitle = f"Summary Statistcis - {prop}"
+            #subtitle = f"Summary Statistcis - {prop}"
             fig = summary_table_res[split_nm][prop]
             summarytab_content = generate_data_metric_section(metric_heading="",
                                                             fig=fig, #drift_radar_plot,
-                                                            subheading=subtitle,
+                                                            #subheading=subtitle,
                                                             footnote="",
                                                             )
             summary_content_list.append(summarytab_content)
