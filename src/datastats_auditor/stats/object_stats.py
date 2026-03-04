@@ -2081,6 +2081,54 @@ if __name__ == "__main__":
                )
     
     #%%
+    class SummaryTablePlot:
+        def __init__(self, summary_result, distribution_names,
+                     property_names, **kwargs
+                     ):
+            self.summary_result = summary_result
+            if isinstance(distribution_names, str):
+                distribution_names = [distribution_names]
+            
+            if isinstance(property_names, str):
+                property_names = [property_names]
+                
+            self.distribution_names = distribution_names
+            
+            self.property_names = property_names
+            self.kwargs = kwargs
+            
+        def create_tables(self):
+            result = {}
+            for dist_nm in self.distribution_names:
+                prop_tables = {}
+                dist_sumr = self.summary_result[dist_nm]
+                
+                for prop in self.property_names:
+                    df = dist_sumr[prop]
+                    title = f"Summary Statistics of {prop}".capitalize()
+                    table = plot_table(df=df,
+                                        cells_colname=prop,
+                                        title=self.kwargs.get("title", title),
+                                        **self.kwargs
+                                        )
+                    prop_tables[prop] = table
+                result[dist_nm] = prop_tables
+            return result
+            
+    #%%
+    
+    summary_properties = list(single_summary_stat_res['train'].keys())
+    summary_distr_nms = list(single_summary_stat_res.keys())
+    
+    summary_stat_tables_cls = SummaryTablePlot(single_summary_stat_res, distribution_names=summary_distr_nms,
+                                            property_names=summary_properties
+                                            )
+    
+    summary_table_res = summary_stat_tables_cls.create_tables()
+    #%%
+    
+    summary_table_res["train"]['relative_bbox_area']#.keys()
+    #%%
     
     
     #%%
@@ -2640,22 +2688,19 @@ if __name__ == "__main__":
     
     #%%
     
-    import plotly.graph_objects as go
-    import pandas as pd
-
-    edf = pd.read_csv('https://raw.githubusercontent.com/plotly/datasets/master/2014_usa_states.csv')
-
-    efig = go.Figure(data=[go.Table(
-        header=dict(values=list(edf.columns),
-                    fill_color='paleturquoise',
-                    align='left'),
-        cells=dict(values=[edf.Rank, edf.State, edf.Postal, edf.Population],
-                fill_color='lavender',
-                align='left'))
-    ])
-
-    efig.show()
+    summary_content_list = []
+    for split_nm in summary_distr_nms:
+        for prop in summary_properties:
+            subtitle = f"Summary Statistcis - {prop}"
+            fig = summary_table_res[split_nm][prop]
+            summarytab_content = generate_data_metric_section(metric_heading="",
+                                                            fig=fig, #drift_radar_plot,
+                                                            subheading=subtitle,
+                                                            footnote="",
+                                                            )
+            summary_content_list.append(summarytab_content)
     
+    summary_stat_section = "\n".join([i for i in summary_content_list])
     
     #%%
     
@@ -2776,7 +2821,8 @@ if __name__ == "__main__":
                 "Data Collection": data_collection_section,
                 "Annotation & Labeling": labelling_section,
                 "Data Split Composition": split_section,
-                "Data Summary Statistics": summary_fig_content,
+                "Data Overview": summary_stat_section,
+                #"Data Summary Statistics": summary_fig_content,  
                 "Data space metrics": drift_contents,
                 "Transformation": transformation_section,
                 "License & Usage": license_section
