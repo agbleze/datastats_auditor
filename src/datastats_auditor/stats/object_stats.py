@@ -2618,8 +2618,6 @@ if __name__ == "__main__":
         
     ]
     histplot_cls = HistPlot(df=full_split_df, property_names=scene_properties,
-                         #color="category_name", 
-                         # barmode="stack",
                          facet_row="split_type",
                          height=500, width=700,
                          )
