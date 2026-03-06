@@ -2721,18 +2721,7 @@ if __name__ == "__main__":
     #cardgen = DatasetCardCreator(sections=motsect, renderer=mkd_render)
     # %%
     #datacard_md = cardgen.generate()
-    # %%
-    import os
-    os.path.join(Path("output_path.md").stem, ".pdf")
-
-    #%%
-    #f"{Path('name/folder/output_path.md')}"
     #'name/folder/output_path.md'.split(".md")[0]
-    #%%
-    
-    Path('output_path.md').suffix#.removesuffix("md") + ".pdf"
-    
-
 
     #%%
 
