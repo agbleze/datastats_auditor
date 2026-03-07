@@ -1649,7 +1649,6 @@ if __name__ == "__main__":
     #%%
 
     train_annot_df.groupby("category_name")["image_id"].nunique().sum()
-    # %%
 
     # %%
     #ann_df = coco_annotation_to_df(train_annfile)
@@ -1678,8 +1677,6 @@ if __name__ == "__main__":
 
     train_df.area_bin.isna().sum()
 
-
-    # %%
 
     #%%
 
@@ -2036,7 +2033,7 @@ if __name__ == "__main__":
     
     #%%
     
-    single_summary_stat_res['train']['relative_bbox_area_variance_per_image'].set_index("index").T.add_prefix()#.columns#.keys()
+    #single_summary_stat_res['train']['relative_bbox_area_variance_per_image'].set_index("index").T.add_prefix()#.columns#.keys()
     
     
     #%%
@@ -2046,7 +2043,7 @@ if __name__ == "__main__":
 
     #%%
     
-    pd.DataFrame([1, 2, 3], columns=["a", "b", "c"])
+    #pd.DataFrame([1, 2, 3], columns=["a", "b", "c"])
     #%%
     
     list(single_summary_stat_res['train']['relative_bbox_area_variance_per_image']['relative_bbox_area_variance_per_image'].values) #.tolist()
@@ -2582,32 +2579,34 @@ if __name__ == "__main__":
     
     #%%  heatmap content
     
-    train_val_spatial_drift_content = generate_data_metric_section(metric_heading=f"Probability Distribution Heatmap of Relative Object Centers", 
+    train_val_spatial_drift_content = generate_data_metric_section(metric_heading="", 
                                                                     fig=train_val_heatmap, 
-                                                                    subheading=f"Train vs Val Object Height and Width Center Distribution - Spatial Drift", 
+                                                                    subheading=f"Spatial Drift: Relative Object Centers - Train vs Val", 
                                                                     footnote=f"Jensen Shannon Divergence: {train_val_spatial_drift['js_2d']: .3f} | Wasserstein: {train_val_spatial_drift['w1_2d']: .3f}"  
                                                                     )
     
-    train_test_spatial_drift_content = generate_data_metric_section(metric_heading=f"Probability Distribution Heatmap of Relative Object Centers",
+    train_test_spatial_drift_content = generate_data_metric_section(metric_heading="",
                                                                     fig=train_test_heatmap, 
-                                                                    subheading=f"Train vs Test Object Height and Width Center Distribution - Spatial Drift", 
+                                                                    subheading=f"Spatial Drift: Relative Object Centers - Train vs Test", 
                                                                     footnote=f"Jensen Shannon Divergence: {train_test_spatial_drift['js_2d']: .3f} | Wasserstein: {train_test_spatial_drift['w1_2d']: .3f}" 
                                                                     )
     
-    val_test_spatial_drift_content = generate_data_metric_section(metric_heading=f"Probability Distribution Heatmap of Relative Object Centers",
+    val_test_spatial_drift_content = generate_data_metric_section(metric_heading="",
                                                                     fig=val_test_heatmap, 
-                                                                    subheading=f"Val vs Test Object Height and Width Center Distribution - Spatial Drift", 
+                                                                    subheading=f"Spatial Drift: Relative Object Centers - Val vs Test", 
                                                                     footnote=f"Jensen Shannon Divergence: {val_test_spatial_drift['js_2d']: .3f} | Wasserstein: {val_test_spatial_drift['w1_2d']: .3f}"  
                                                                     )
     
     #%% Histogram distribution
     
     hist_props = ["relative_bbox_area", 'bbox_aspect_ratio']
-    scene_properties = ['foreground_union_area_per_image',
-                        'occupancy_per_image', 'background_area_per_image',
-                        'foreground_to_background_area_per_image', 'background_area_norm',
-                        'foreground_occupancy_to_background_occupany', 'num_bboxes_per_image',
-                        'relative_bbox_area_variance_per_image',
+    scene_properties = [#'foreground_union_area_per_image',
+                        'occupancy_per_image', 
+                        #'background_area_per_image',
+                        #'foreground_to_background_area_per_image', 
+                        #'background_area_norm',
+                        #'foreground_occupancy_to_background_occupany', 'num_bboxes_per_image',
+                        #'relative_bbox_area_variance_per_image',
                         ]
     all_properties = ["relative_bbox_area", 'bbox_aspect_ratio',
                       'foreground_union_area_per_image',
@@ -2637,10 +2636,11 @@ if __name__ == "__main__":
     hist_figs.update(obj_hist_figs)
     
     #%%
-    hist_figs['foreground_union_area_per_image']#.keys()
+    #hist_figs['foreground_union_area_per_image']#.keys()
     
     
     #%%
+    
     hist_fig_list = []
     for prop, fig in hist_figs.items():
         _ = prop if prop in scene_properties else f"{prop} per Object"
@@ -2658,7 +2658,8 @@ if __name__ == "__main__":
                                                         )
     
     #%%
-    drift_figs = [object_bias_content, train_val_drift_content, train_test_drift_content, val_test_drift_content,
+    drift_figs = [#object_bias_content, 
+                  train_val_drift_content, train_test_drift_content, val_test_drift_content,
                     train_val_spatial_drift_content, train_test_spatial_drift_content,
                     val_test_spatial_drift_content,
                     ]
@@ -2679,7 +2680,6 @@ if __name__ == "__main__":
                                                     footnote=f""  
                                                     )
         summary_fig_list.append(sumstat_content)
-        
     summary_fig_content = "\n".join([i for i in summary_fig_list])
     summary_fig_content
         
@@ -2697,7 +2697,7 @@ if __name__ == "__main__":
                                                             footnote="",
                                                             )
             summary_content_list.append(summarytab_content)
-    
+    summary_content_list.append(object_bias_content)
     summary_stat_section = "\n".join([i for i in summary_content_list])
     
     #%%
@@ -2744,13 +2744,13 @@ if __name__ == "__main__":
                     }
 
 
-    auth_kwargs = {"header": "2. Authorship & Ownership",
+    auth_kwargs = {"header": "Authorship & Ownership",
                     "Organization": "ORG",
                     "Industry": "TECH",
                     "Dataset owners": "AI TEAM"                   
                     }
 
-    data_col_kwargs = {"header": "4. Data Collection",
+    data_col_kwargs = {"header": "Data Collection",
                         "Collection strategy": "camera recording",
                         "Devices": "mobile phone",
                         "Collection Sites": "farm",
@@ -2758,7 +2758,7 @@ if __name__ == "__main__":
                         }
 
 
-    labelling_kwargs = {"header": "5. Annotation & Labeling",
+    labelling_kwargs = {"header": "Annotation & Labeling",
                         "Labeling method": "human",
                         "Label types": "bbox, segmentation mask",
                         "Annotation format": "COCO",
@@ -2766,7 +2766,7 @@ if __name__ == "__main__":
                         "Platform": "CVAT"    
                         }
 
-    licence_kwargs = {"header": "9. Licensing & Usage",
+    licence_kwargs = {"header": "Licensing & Usage",
                     "License": "BSD",
                     "Usage restrictions": "Internal-only",
                     "Redistribution policy": "N/A"
@@ -2821,19 +2821,90 @@ if __name__ == "__main__":
 
     #%%
     
+    def create_section_head(**kwargs):
+        header = kwargs.get("header", "")
+        header = f"{header}" if header else ""
+        #sect_content = "\n".join([f"- {key}: {value}" for key, value in kwargs.items() if key != "header"])
+        section_content = kwargs.get("section", "")
+        section = f""" 
+<H1 style="color:#2A7FFF; font-weight:bold;">
+ {header}
+</H1>
+
+{section_content}
+    
+    """
+        return section.strip()
     
     
+    #%%
+    
+    title = create_section_head(header="Data Card")
+    data_overview = create_section_head(header="Data Overview",
+                                        section=summary_section
+                                        )
+    summary_statistics = create_section_head(header="Descriptive Summary Statistics",
+                                             section=summary_stat_section
+                                             )
+    dataspace_metrics = create_section_head(header="Data Space Metrics",
+                                            section=drift_contents
+                                            )
+    motivation_section = create_section_head(header="Motivation and Intended Use",
+                                             section=moti_content
+                                             )
+    #%%
+    joined_section = "\n".join([title, authorship_section, motivation_section, # moti_content, 
+                                data_overview,
+                                data_collection_section, labelling_section, split_section,
+                                summary_statistics, #summary_stat_section, 
+                                dataspace_metrics, #drift_contents, 
+                                transformation_section,
+                                license_section
+                                ])
+    
+    #%%
+    
+    print(joined_section)
+    
+    
+    #%%
+    
+    
+        
     #%%
     
     from markdown import markdown
     from weasyprint import HTML
-
-    html = markdown(card_sections, output_format="html5")
-    HTML(string=html).write_pdf("dataset_card_drift.pdf")
-
+    
+    def write_md_to_pdf(markdown_content: str, pdf_path: str):
+        html = markdown(markdown_content, output_format="html5")
+        HTML(string=html).write_pdf(pdf_path)
+        
+    #%%
+    write_md_to_pdf(joined_section, pdf_path="dataset_card_join_raw.pdf")
+    
     #%%
 
-    export_md_to_pdf(card_sections, save_path="card_sections.pdf")
+    html = markdown(joined_section, output_format="html5")
+    HTML(string=html).write_pdf("dataset_card_join_raw.pdf")
+
+    
+        
+        
+    #%%
+    
+    ["Scene composition: Distribution of relative_bbox_area_variance_per_image",
+     "Scene composition: Distribution of background_area_per_image",
+     "Scene composition: Distribution of foreground_union_area_per_image",
+     "Scene composition: Distribution of foreground_to_background_area_per_image",
+     "Scene composition: Distribution of background_area_norm",
+     "Scene composition: Distribution of foreground_occupancy_to_background_occupany",
+     
+        
+    ]
+    #%%
+
+    export_md_to_pdf(joined_section, save_path="card_sections_raw_join.pdf")
 
     
     #%%
