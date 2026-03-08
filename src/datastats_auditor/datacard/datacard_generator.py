@@ -4,6 +4,7 @@
 from pathlib import Path
 import os
 from markdown_pdf import MarkdownPdf, Section
+import base64
 
 class DatasetCardCreator:
     def __init__(self, sections: dict, renderer):
@@ -57,8 +58,6 @@ def build_motivations_and_use(
         return "\n".join([f"- {item}" for item in items])
 
     section = f"""
-# Motivations & Use
-
 ## Dataset Purpose(s)
 {bullets(purposes)}
 
@@ -99,10 +98,8 @@ def generate_data_metric_section(metric_heading, fig,
     ### {subheading}
 
     {img_md}
-
-    
+ 
     {footnote}
-    ---
     """
     return md_content
     
