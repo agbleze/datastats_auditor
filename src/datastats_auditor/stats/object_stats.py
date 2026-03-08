@@ -1052,11 +1052,12 @@ class DriftMetricSuite:
         else:
             self.metrics = metrics
             
-    def drift_metrics(self):
+    def drift_metrics(self, plot_metric_name="js"):
         self.drift_results = {}
         self.spatial_drift_result = {}
         self.spatial_distribution = {}
         self.spatial_heatmap = {}
+        self.drift_plot = {}
         
         for pair in self.distribution_pairs:
             ref, comp = pair
@@ -1109,15 +1110,28 @@ class DriftMetricSuite:
                                                                     "distribution_pair": pair,
                                                                     "property": field
                                                                     }  
-        #print(f"spatial_distr[pair[0]]: {spatial_distr[pair[0]]}")
-        #print(f"spatial_distr[pair[1]]: {spatial_distr[pair[1]]}")
-        # self.spatial_drift_result[pair] = DriftStats.get_spatial_drift(spatial_distr[pair[0]],
-        #                                                             spatial_distr[pair[1]],
-        #                                                             )  
+        
+        for pair in self.distribution_pairs:
+            df = get_drift_result_as_df(drift_results=self.drift_results,
+                                        distribution_pair=str(pair),
+                                        property_field_name="property",
+                                        metric_name=plot_metric_name,
+                                        )
+            
+            title = f"{plot_metric_name}".upper()
+            title = f"{title} Divergence between {pair} Distribution"
+            plot = plot_drift_radar(drift_df=df, drift_properties_colname="property",
+                                    drift_scores_colname="scores",
+                                    title=title, height=self.kwargs.get("height"),
+                                    width=self.kwargs.get("width")
+                                    )
+            self.drift_plot[pair] = plot
+            
         return {"drift": self.drift_results, 
                 "spatial_drift": self.spatial_drift_result,
                 "spatial_distribution": self.spatial_distribution,
-                "spatial_heatmap": self.spatial_heatmap
+                "spatial_heatmap": self.spatial_heatmap,
+                "drift_plot": self.drift_plot
                 }    
 
 
@@ -1785,6 +1799,91 @@ if __name__ == "__main__":
     #%%
 
     split_stats_res['split_dfs'].keys()
+    
+    #%%
+    
+    def compute_summary_stats_wider(result, properties=["relative_bbox_area",
+                                                "bbox_aspect_ratio",
+                                                "num_bboxes_per_image"
+                                                ],
+                              **kwargs
+                            ):
+        stats = ["mean", "min", "max", "median", "std", "skew", "kurt"]
+        split_dfs = result['split_dfs']
+        stats_df_list = []
+        for split_nm, split_df in split_dfs.items():
+            for col in properties:
+                df = compute_stats(df=split_df, prop=col, 
+                                group=kwargs.get("group"),
+                                stats=kwargs.get("stats", stats)
+                                    )
+                df = df.set_index("index").T
+                df = df.round(kwargs.get("round", 5))
+                df["attribute"] = f"{split_nm}_{df.index[0]}"
+                stats_df_list.append(df)
+        summary_stat_df = pd.concat(stats_df_list)
+        return summary_stat_df
+            
+        
+    #%%
+    
+    summary_stats_df = compute_summary_stats_wider(split_stats_res)
+    
+    
+    #%%
+    
+    
+    #%%
+    import plotly.graph_objects as go
+    
+    def compute_column_widths(df, min_width=80, max_width=300):
+        widths = []
+        for col in df.columns:
+            values = df[col].astype(str)
+            max_len = max([len(col)] + [len(v) for v in values])
+            width = max(min_width, min(max_width, max_len * 9))
+            widths.append(width)
+        return widths
+    
+
+    def plot_summary_table(df, title="Summary Statistics", **kwargs):
+        columns = list(df.columns[::-1])
+        col_widths = compute_column_widths(df=df)[::-1]
+        fig = go.Figure(data=[go.Table(columnwidth=col_widths,
+                                header=dict(values=columns,
+                                            fill_color="#1f2c56",
+                                            font=dict(color="white", size=12),
+                                            align="left"
+                                            ),
+                                cells=dict(values=[df[col] for col in columns], 
+                                            fill_color="#2d3e6b",
+                                            font=dict(color="white", size=11),
+                                            align="left",
+                                        )
+                                )
+                            ]
+                        )
+
+        fig.update_layout(title=kwargs.get("title", title),
+                            height=kwargs.get("height"),
+                            width=kwargs.get("width", 700),
+                            margin=kwargs.get("margin",dict(l=10, r=10, t=40, b=10)),
+                            template=kwargs.get("template","plotly_dark")
+                        )
+
+        return fig
+
+    #%% Example usage:
+    wider_summary_table_fig = plot_summary_table(summary_stats_df, height=300)
+    wider_summary_table_fig
+
+    #%%
+    wider_summary_table_fig_base64 = fig_to_base64(wider_summary_table_fig)
+    
+
+    #%%
+    compute_column_widths(summary_stats_df)
+    
     #%%
     pd.concat([train_df["relative_bbox_area"], val_df["relative_bbox_area"]])
 
@@ -1793,9 +1892,9 @@ if __name__ == "__main__":
 
     #%%
 
-    train_df.columns 
+    #train_df.columns 
 
-    val_df.columns  
+    val_df[["relative_bbox_area"]].agg(["mean", "min", "max", "median", "std", "skew", "kurt"]).reset_index().set_index("index").T.index[0]#.values[0]#columns  
 
     #%%
 
@@ -1808,7 +1907,24 @@ if __name__ == "__main__":
 
     full_split_df = pd.concat([train_df, val_df, test_df], ignore_index=True)
 
+    #%%
+    
+    (full_split_df.groupby(["split_type", "relative_bbox_area",
+                            "bbox_aspect_ratio","num_bboxes_per_image"
+                            ]
+                           )[["relative_bbox_area",
+                            "bbox_aspect_ratio","num_bboxes_per_image"
+                            ]].agg()
+     )
 
+    #%%
+    
+    _stats = compute_stats(df=full_split_df, group=["split_type"],
+                  prop=["relative_bbox_area",
+                            "bbox_aspect_ratio","num_bboxes_per_image"],
+                  stats=["mean", "std", "min", "max", "median", "skew",]
+                  
+                  )
     #%%
     def plot_histogram(df, **kwargs):
         fig = px.histogram(df, x=kwargs.get("x"), 
@@ -1901,9 +2017,6 @@ if __name__ == "__main__":
     test_compdf = train_test_drift_cls.comparison_distribution
     test_compdf.groupby("bbox_area_bin_label").size()
 
-
-    #%%
-
     #%%
             
     #%%
@@ -1959,7 +2072,7 @@ if __name__ == "__main__":
 
     #%%
 
-    drift_results["spatial_drift"]
+    drift_results["drift"].keys()#["spatial_drift"]
 
 
     #%%
@@ -2166,7 +2279,7 @@ if __name__ == "__main__":
         #drift_radar_data = {}
         drift_property = []
         drift_metric = []
-        for k, v in drift_results["drift"].items():
+        for k, v in drift_results.items():
             if k.startswith(distribution_pair) and k.endswith(metric_name):
                 drift_property.append(v[property_field_name])
                 drift_metric.append(v[metric_name])
@@ -2179,19 +2292,19 @@ if __name__ == "__main__":
             
 
     #%%
-    train_val_drift_df = get_drift_result_as_df(drift_results=drift_results,
+    train_val_drift_df = get_drift_result_as_df(drift_results=drift_results["drift"],
                                                 distribution_pair="('train', 'val')",
                                                 property_field_name="property",
                                                 metric_name="js",
                                                 )
     
-    train_test_drift_df = get_drift_result_as_df(drift_results=drift_results,
+    train_test_drift_df = get_drift_result_as_df(drift_results=drift_results["drift"],
                                                 distribution_pair="('train', 'test')",
                                                 property_field_name="property",
                                                 metric_name="js",
                                                 )
     
-    val_test_drift_df = get_drift_result_as_df(drift_results=drift_results,
+    val_test_drift_df = get_drift_result_as_df(drift_results=drift_results["drift"],
                                                 distribution_pair="('val', 'test')",
                                                 property_field_name="property",
                                                 metric_name="js",
@@ -2553,18 +2666,52 @@ if __name__ == "__main__":
     
     #%%
     train_val_drift_content = generate_data_metric_section(metric_heading="Data Drift Detection on Data Attributes",
-                                                fig=train_val_drift_radar_plot, #val_test_heatmap, #drift_radar_plot,
-                                                subheading="Jensen Shannon Divergence on Train vs Val Distribution",
-                                                footnote="Score > 0.05 indicates statistically significant drift",
-                                                )
+                                                            fig=train_val_drift_radar_plot, #val_test_heatmap, #drift_radar_plot,
+                                                            subheading="Jensen Shannon Divergence on Train vs Val Distribution",
+                                                            footnote="Score > 0.05 indicates statistically significant drift",
+                                                            )
+    
+    
+    #%%
+    def create_drift_section(drift_result, metric_used="Jensen Shannon Divergence",
+                             drift_key='js_2d', 
+                             
+                             ):
+        section_list = []
+        drift_plot = drift_result["drift_plot"]
+        drift_spatial_heatmap = drift_result["spatial_heatmap"]
+        spatial_drift = drift_result['spatial_drift']
+        for idx, (distr_pair, fig) in enumerate(drift_plot.items()):
+            heading = "Data Drift Detection on Data Attributes" if idx == 0 else ""
+            
+            sec = generate_data_metric_section(metric_heading=heading,
+                                        fig=fig,
+                                        subheading=f"{metric_used} on {distr_pair} Distribution",
+                                        footnote="Score > 0.05 indicates statistically significant drift",
+                                        )
+            section_list.append(sec)
+        
+        for idx, (distr_pair, fig) in enumerate(drift_spatial_heatmap.items()):
+            pair_spatial_dirft = spatial_drift[distr_pair]
+            spatial_drift_content = generate_data_metric_section(metric_heading="", 
+                                                                            fig=train_val_heatmap, 
+                                                                            subheading=f"Spatial Drift: Relative Object Centers - {distr_pair}", 
+                                                                            footnote=f"{metric_used}: {pair_spatial_dirft[drift_key]: .3f} | Wasserstein: {pair_spatial_dirft['w1_2d']: .3f}"  
+                                                                            )
+            section_list.append(spatial_drift_content)
+        
+        drift_section_content = "\n".join([i for i in section_list])
+        return drift_section_content
+        
+    
     
     #%%
     
     train_test_drift_content = generate_data_metric_section(metric_heading="",
-                                                fig=train_test_drift_radar_plot, #drift_radar_plot,
-                                                subheading="Jensen Shannon Divergence on Train vs Test Distribution",
-                                                footnote="Score > 0.05 indicates statistically significant drift",
-                                                )
+                                                            fig=train_test_drift_radar_plot, #drift_radar_plot,
+                                                            subheading="Jensen Shannon Divergence on Train vs Test Distribution",
+                                                            footnote="Score > 0.05 indicates statistically significant drift",
+                                                            )
     
     
     #%%
@@ -2650,6 +2797,28 @@ if __name__ == "__main__":
                                                     footnote=f""  
                                                     )
         hist_fig_list.append(hist_content)
+     
+        
+    def create_scene_composition_section(scene_results, 
+                                         data_properites=["occupancy_per_image",
+                                                          "relative_bbox_area",
+                                                          "bbox_aspect_ratio"
+                                                          ],
+                                         ):
+        contents_list = []
+        for idx, prop in enumerate(data_properites):
+            heading = "Scene composition" if idx == 0 else ""
+            fig = scene_results[prop]
+            _ = prop if prop in scene_properties else f"{prop} per Object"
+            scene_content = generate_data_metric_section(metric_heading=heading,
+                                                        fig=fig,
+                                                        subheading=f"Distribution of {prop}", 
+                                                        footnote=f""  
+                                                        )
+            contents_list.append(scene_content)
+        scene_contents = "\n".join([i for i in contents_list])
+        return scene_contents
+        
     
     #%%
     
@@ -2686,20 +2855,50 @@ if __name__ == "__main__":
     
     #%%
     
-    summary_content_list = []
-    for split_nm in summary_distr_nms:
-        for prop in summary_properties:
-            #subtitle = f"Summary Statistcis - {prop}"
-            fig = summary_table_res[split_nm][prop]
-            summarytab_content = generate_data_metric_section(metric_heading="",
-                                                            fig=fig, #drift_radar_plot,
-                                                            #subheading=subtitle,
-                                                            footnote="",
-                                                            )
-            summary_content_list.append(summarytab_content)
-    summary_content_list.append(object_bias_content)
-    summary_stat_section = "\n".join([i for i in summary_content_list])
+    # summary_content_list = []
+    # for split_nm in summary_distr_nms:
+    #     for prop in summary_properties:
+    #         #subtitle = f"Summary Statistcis - {prop}"
+    #         fig = summary_table_res[split_nm][prop]
+    #         summarytab_content = generate_data_metric_section(metric_heading="",
+    #                                                         fig=fig, #drift_radar_plot,
+    #                                                         #subheading=subtitle,
+    #                                                         footnote="",
+    #                                                         )
+    #         summary_content_list.append(summarytab_content)
+    # summary_content_list.append(object_bias_content)
+    # summary_stat_section = "\n".join([i for i in summary_content_list])
     
+    #%%
+    def create_summary_stat_section(summary_table_result,
+                                    properties: Union[list, None]=["relative_bbox_area",
+                                                                   "bbox_aspect_ratio",
+                                                                   "num_bboxes_per_image"
+                                                                   ]
+                                    ):
+        distr_nms = list(summary_table_result.keys())
+        if not properties:
+            properties = list(summary_table_result[distr_nms[0]])
+        summary_content_list = []
+        for split_nm in distr_nms:
+            for prop in properties:
+                fig = summary_table_result[split_nm][prop]
+                summarytab_content = generate_data_metric_section(metric_heading="",
+                                                                  subheading=split_nm,
+                                                                fig=fig,
+                                                                footnote="",
+                                                                )
+                summary_content_list.append(summarytab_content)
+        summary_stat_section = "\n".join([i for i in summary_content_list])
+        return summary_stat_section
+    
+    
+    #%%
+    
+    summary_stat_section = create_summary_stat_section(summary_table_result=summary_table_res)
+    
+    #summary_stat_section.join([object_bias_content])
+    summary_stat_section = "\n".join([summary_stat_section, object_bias_content])
     #%%
     
     summary_stat_res
@@ -2775,7 +2974,6 @@ if __name__ == "__main__":
     trans_kwargs = {"header":"Transformation",
                     "Technique":"Augmentation",
                     "Parameters": {},
-
                     "Libraries used": "Augment" 
         
     }
@@ -2839,6 +3037,10 @@ if __name__ == "__main__":
     
     #%%
     
+    wider_summary_table_fig_base64 = fig_to_base64(wider_summary_table_fig)
+
+    #%%
+    
     title = create_section_head(header="Data Card")
     data_overview = create_section_head(header="Data Overview",
                                         section=summary_section
@@ -2846,6 +3048,9 @@ if __name__ == "__main__":
     summary_statistics = create_section_head(header="Descriptive Summary Statistics",
                                              section=summary_stat_section
                                              )
+    wider_summary_statistics_section = create_section_head(header="Descriptive Summary Statistics",
+                                                            section=wider_summary_table_fig_base64
+                                                            )
     dataspace_metrics = create_section_head(header="Data Space Metrics",
                                             section=drift_contents
                                             )
@@ -2853,10 +3058,11 @@ if __name__ == "__main__":
                                              section=moti_content
                                              )
     #%%
-    joined_section = "\n".join([title, authorship_section, motivation_section, # moti_content, 
+    joined_section = "\n".join([title, authorship_section, 
+                                motivation_section, # moti_content, 
                                 data_overview,
                                 data_collection_section, labelling_section, split_section,
-                                summary_statistics, #summary_stat_section, 
+                                wider_summary_statistics_section, #summary_statistics, #summary_stat_section, 
                                 dataspace_metrics, #drift_contents, 
                                 transformation_section,
                                 license_section
