@@ -2852,21 +2852,6 @@ if __name__ == "__main__":
     summary_fig_content
         
     
-    #%%
-    
-    # summary_content_list = []
-    # for split_nm in summary_distr_nms:
-    #     for prop in summary_properties:
-    #         #subtitle = f"Summary Statistcis - {prop}"
-    #         fig = summary_table_res[split_nm][prop]
-    #         summarytab_content = generate_data_metric_section(metric_heading="",
-    #                                                         fig=fig, #drift_radar_plot,
-    #                                                         #subheading=subtitle,
-    #                                                         footnote="",
-    #                                                         )
-    #         summary_content_list.append(summarytab_content)
-    # summary_content_list.append(object_bias_content)
-    # summary_stat_section = "\n".join([i for i in summary_content_list])
     
     #%%
     def create_summary_stat_section(summary_table_result,
