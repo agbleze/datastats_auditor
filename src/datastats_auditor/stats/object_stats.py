@@ -1589,10 +1589,10 @@ def create_drift_section(drift_result, metric_used="Jensen Shannon Divergence",
     for idx, (distr_pair, fig) in enumerate(drift_spatial_heatmap.items()):
         pair_spatial_dirft = spatial_drift[distr_pair]
         spatial_drift_content = generate_data_metric_section(metric_heading="", 
-                                                                        fig=train_val_heatmap, 
-                                                                        subheading=f"Spatial Drift: Relative Object Centers - {distr_pair}", 
-                                                                        footnote=f"{metric_used}: {pair_spatial_dirft[drift_key]: .3f} | Wasserstein: {pair_spatial_dirft['w1_2d']: .3f}"  
-                                                                        )
+                                                            fig=fig, 
+                                                            subheading=f"Spatial Drift: Relative Object Centers - {distr_pair}", 
+                                                            footnote=f"{metric_used}: {pair_spatial_dirft[drift_key]: .3f} | Wasserstein: {pair_spatial_dirft['w1_2d']: .3f}"  
+                                                            )
         section_list.append(spatial_drift_content)
     
     drift_section_content = "\n".join([i for i in section_list])
@@ -1978,49 +1978,49 @@ if __name__ == "__main__":
 
     #%%
 
-    areas = train_df["relative_bbox_area"]#.clip(1e-9, 1.0)
+    # areas = train_df["relative_bbox_area"]#.clip(1e-9, 1.0)
 
-    #%%
+    # #%%
 
-    areas
+    # areas
 
-    bins = np.quantile(areas, np.linspace(0, 1, 5 + 1))
-    # %%
-    min_area = areas[areas > 0].min()
-    bins = np.logspace(np.log10(min_area), 0, 5 + 1)
+    # bins = np.quantile(areas, np.linspace(0, 1, 5 + 1))
+    # # %%
+    # min_area = areas[areas > 0].min()
+    # bins = np.logspace(np.log10(min_area), 0, 5 + 1)
 
-    bins = np.linspace(0, 1, 5 +1)
-    #%%
+    # bins = np.linspace(0, 1, 5 +1)
+    # #%%
 
-    for i in bins:
-        print(f"{i:.6f}")
-        break
+    # for i in bins:
+    #     print(f"{i:.6f}")
+    #     break
 
 
-    # %%
-    pd.cut(areas, bins=bins, include_lowest=True)#.value_counts().sort_index()
-    # %%
-    data_a = [i for i in np.arange(1, 100, 2)]
-    # %%
-    data_b = [i for i in np.arange(51, 150, 2)]
-    # %%
-    bins_exp = np.quantile(data_a, np.linspace(0, 1, 5 + 1))
-    # %%
-    pd.cut(data_a, bins=bins_exp, include_lowest=True)
-    # %%
-    pd.cut(data_b, bins=bins_exp, include_lowest=True)
-    # %%
-    eq_bins = np.linspace(np.min(data_a), np.max(data_a), 5 +1)
-    eq_bins = np.concatenate(([-np.inf], eq_bins, [np.inf]))
+    # # %%
+    # pd.cut(areas, bins=bins, include_lowest=True)#.value_counts().sort_index()
+    # # %%
+    # data_a = [i for i in np.arange(1, 100, 2)]
+    # # %%
+    # data_b = [i for i in np.arange(51, 150, 2)]
+    # # %%
+    # bins_exp = np.quantile(data_a, np.linspace(0, 1, 5 + 1))
+    # # %%
+    # pd.cut(data_a, bins=bins_exp, include_lowest=True)
+    # # %%
+    # pd.cut(data_b, bins=bins_exp, include_lowest=True)
+    # # %%
+    # eq_bins = np.linspace(np.min(data_a), np.max(data_a), 5 +1)
+    # eq_bins = np.concatenate(([-np.inf], eq_bins, [np.inf]))
 
-    pd.cut(data_b, bins=eq_bins, include_lowest=True)
-    # %%
-    #bins = 
+    # pd.cut(data_b, bins=eq_bins, include_lowest=True)
+    # # %%
+    # #bins = 
 
-    np.logspace(np.log10(np.min(data_a)), np.log10(np.max(data_a)), 5 + 1)
-    # %%
+    # np.logspace(np.log10(np.min(data_a)), np.log10(np.max(data_a)), 5 + 1)
+    # # %%
 
-    val_df["area_bin_label"].isna().sum()
+    # val_df["area_bin_label"].isna().sum()
 
 
     #%%
@@ -2107,22 +2107,6 @@ if __name__ == "__main__":
     #%%
     wider_summary_table_fig_base64 = fig_to_base64(wider_summary_table_fig)
     
-
-    #%%
-    compute_column_widths(summary_stats_df)
-    
-    #%%
-    pd.concat([train_df["relative_bbox_area"], val_df["relative_bbox_area"]])
-
-
-    #%%
-
-    #%%
-
-    #train_df.columns 
-
-    val_df[["relative_bbox_area"]].agg(["mean", "min", "max", "median", "std", "skew", "kurt"]).reset_index().set_index("index").T.index[0]#.values[0]#columns  
-
     #%%
 
     train_df["split_type"] = "train"
@@ -2146,12 +2130,12 @@ if __name__ == "__main__":
 
     #%%
     
-    _stats = compute_stats(df=full_split_df, group=["split_type"],
-                  prop=["relative_bbox_area",
-                            "bbox_aspect_ratio","num_bboxes_per_image"],
-                  stats=["mean", "std", "min", "max", "median", "skew",]
+    # _stats = compute_stats(df=full_split_df, group=["split_type"],
+    #               prop=["relative_bbox_area",
+    #                         "bbox_aspect_ratio","num_bboxes_per_image"],
+    #               stats=["mean", "std", "min", "max", "median", "skew",]
                   
-                  )
+    #               )
     #%%
     
     
@@ -2181,65 +2165,70 @@ if __name__ == "__main__":
     #%%
 
 
-    drift_cls = DriftStats(reference_distribution=train_df,
-                        comparison_distribution=val_df,
-                        field_to_bin="relative_bbox_area",
-                        name_bin_field_as="bbox_area_bin",
-                        name_bin_field_label_as="bbox_area_bin_label"
-                        )
+    # drift_cls = DriftStats(reference_distribution=train_df,
+    #                     comparison_distribution=val_df,
+    #                     field_to_bin="relative_bbox_area",
+    #                     name_bin_field_as="bbox_area_bin",
+    #                     name_bin_field_label_as="bbox_area_bin_label"
+    #                     )
 
 
-    #%%
+    # #%%
 
-    train_val_drift = drift_cls.compute_drift()
-
-
-    #%%
-
-    train_val_drift
-
-    #%%
-
-    train_refdf = drift_cls.reference_distribution
-
-    train_refdf.groupby("bbox_area_bin_label").size()
-
-    #%%
-    val_compdf = drift_cls.comparison_distribution
-    val_compdf.groupby("bbox_area_bin_label").size()
+    # train_val_drift = drift_cls.compute_drift()
 
 
-    #%%
+    # #%%
 
-    train_test_drift_cls = DriftStats(reference_distribution=train_df,
-                                    comparison_distribution=test_df,
-                                    field_to_bin="relative_bbox_area",
-                                    name_bin_field_as="bbox_area_bin",
-                                    name_bin_field_label_as="bbox_area_bin_label"
-                                    )
+    # train_val_drift
 
-    #%%
+    # #%%
 
-    train_test_drift_res = train_test_drift_cls.compute_drift()
+    # train_refdf = drift_cls.reference_distribution
+
+    # train_refdf.groupby("bbox_area_bin_label").size()
+
+    # #%%
+    # val_compdf = drift_cls.comparison_distribution
+    # val_compdf.groupby("bbox_area_bin_label").size()
 
 
-    train_test_drift_res
+    # #%%
 
-    #%%
+    # train_test_drift_cls = DriftStats(reference_distribution=train_df,
+    #                                 comparison_distribution=test_df,
+    #                                 field_to_bin="relative_bbox_area",
+    #                                 name_bin_field_as="bbox_area_bin",
+    #                                 name_bin_field_label_as="bbox_area_bin_label"
+    #                                 )
 
-    test_compdf = train_test_drift_cls.comparison_distribution
-    test_compdf.groupby("bbox_area_bin_label").size()
+    # #%%
+
+    # train_test_drift_res = train_test_drift_cls.compute_drift()
+
+
+    # train_test_drift_res
+
+    # #%%
+
+    # test_compdf = train_test_drift_cls.comparison_distribution
+    # test_compdf.groupby("bbox_area_bin_label").size()
 
     #%%
             
     #%%
-    train_df.columns
+    #train_df.columns
+    
+    #%%
+    
+    #split_stats_res["split_dfs"]
 
     #%%
-    distributions = {"train": train_df,
-                    "val": val_df,
-                    "test": test_df
-                    }
+    # distributions = {"train": train_df,
+    #                 "val": val_df,
+    #                 "test": test_df
+    #                 }
+    distributions = split_stats_res["split_dfs"]
 
     metrics = ["kl", "js"]
 
@@ -2415,107 +2404,107 @@ if __name__ == "__main__":
 
     #%%
 
-    train_summary_grp_plot = plot_groupbar(train_grp_df, showlegend=True)
-    val_summary_grp_plot = plot_groupbar(val_grp_df, showlegend=False)
-    test_summary_grp_plot = plot_groupbar(test_grp_df, showlegend=False)
-    #%%
+    # train_summary_grp_plot = plot_groupbar(train_grp_df, showlegend=True)
+    # val_summary_grp_plot = plot_groupbar(val_grp_df, showlegend=False)
+    # test_summary_grp_plot = plot_groupbar(test_grp_df, showlegend=False)
+    # #%%
 
-    split_grpplot = {"train": train_summary_grp_plot,
-                    "val": val_summary_grp_plot,
-                    "test": test_summary_grp_plot
-                    }
+    # split_grpplot = {"train": train_summary_grp_plot,
+    #                 "val": val_summary_grp_plot,
+    #                 "test": test_summary_grp_plot
+    #                 }
 
 
-    #%%
+    # #%%
 
-    make_split_plot(split_grpplot, rows=3, cols=1,
-                    height=700,
-                    showlegend=True
-                    )
-    #%%
+    # make_split_plot(split_grpplot, rows=3, cols=1,
+    #                 height=700,
+    #                 showlegend=True
+    #                 )
+    # #%%
     
 
-    #%%
-    train_val_drift_df = get_drift_result_as_df(drift_results=drift_results["drift"],
-                                                distribution_pair="('train', 'val')",
-                                                property_field_name="property",
-                                                metric_name="js",
-                                                )
+    # #%%
+    # train_val_drift_df = get_drift_result_as_df(drift_results=drift_results["drift"],
+    #                                             distribution_pair="('train', 'val')",
+    #                                             property_field_name="property",
+    #                                             metric_name="js",
+    #                                             )
     
-    train_test_drift_df = get_drift_result_as_df(drift_results=drift_results["drift"],
-                                                distribution_pair="('train', 'test')",
-                                                property_field_name="property",
-                                                metric_name="js",
-                                                )
+    # train_test_drift_df = get_drift_result_as_df(drift_results=drift_results["drift"],
+    #                                             distribution_pair="('train', 'test')",
+    #                                             property_field_name="property",
+    #                                             metric_name="js",
+    #                                             )
     
-    val_test_drift_df = get_drift_result_as_df(drift_results=drift_results["drift"],
-                                                distribution_pair="('val', 'test')",
-                                                property_field_name="property",
-                                                metric_name="js",
-                                                )
+    # val_test_drift_df = get_drift_result_as_df(drift_results=drift_results["drift"],
+    #                                             distribution_pair="('val', 'test')",
+    #                                             property_field_name="property",
+    #                                             metric_name="js",
+    #                                             )
     
-    #%%
-    train_val_drift_radar_plot = plot_drift_radar(drift_df=train_val_drift_df,
-                                                drift_properties_colname="property",
-                                                drift_scores_colname="scores",
-                                                title="JS Divergence", height=400,
-                                                width=700
-                                                )
+    # #%%
+    # train_val_drift_radar_plot = plot_drift_radar(drift_df=train_val_drift_df,
+    #                                             drift_properties_colname="property",
+    #                                             drift_scores_colname="scores",
+    #                                             title="JS Divergence", height=400,
+    #                                             width=700
+    #                                             )
     
-    train_test_drift_radar_plot = plot_drift_radar(drift_df=train_test_drift_df,
-                                                drift_properties_colname="property",
-                                                drift_scores_colname="scores",
-                                                title="JS Divergence", width=700,
-                                                height=400,
-                                                )
+    # train_test_drift_radar_plot = plot_drift_radar(drift_df=train_test_drift_df,
+    #                                             drift_properties_colname="property",
+    #                                             drift_scores_colname="scores",
+    #                                             title="JS Divergence", width=700,
+    #                                             height=400,
+    #                                             )
     
-    val_test_drift_radar_plot = plot_drift_radar(drift_df=val_test_drift_df,
-                                                drift_properties_colname="property",
-                                                drift_scores_colname="scores",
-                                                title="JS Divergence", height=400,
-                                                width=700
-                                                )
+    # val_test_drift_radar_plot = plot_drift_radar(drift_df=val_test_drift_df,
+    #                                             drift_properties_colname="property",
+    #                                             drift_scores_colname="scores",
+    #                                             title="JS Divergence", height=400,
+    #                                             width=700
+    #                                             )
+
+    # #%%
+
+    # val_test_drift_radar_plot
 
     #%%
 
-    val_test_drift_radar_plot
+    # train_category_count_df = train_df.groupby("category_name").size().rename("count").reset_index()
+    # val_category_count_df = val_df.groupby("category_name").size().rename("count").reset_index()
+    # test_category_count_df = test_df.groupby("category_name").size().rename("count").reset_index()
+    # #%%
 
-    #%%
+    # train_obj_count_plot = px.bar(train_category_count_df, x="category_name", y="count",
+    #                             title="Category Distribution in Train Set",
+    #                             template="plotly_dark", color="category_name",
+    #                             color_discrete_sequence=px.colors.qualitative.Plotly,
+    #                                 labels={"category_name": "Category", "count": "Count"},
+    #                                 text="count", 
+    #                             )
 
-    train_category_count_df = train_df.groupby("category_name").size().rename("count").reset_index()
-    val_category_count_df = val_df.groupby("category_name").size().rename("count").reset_index()
-    test_category_count_df = test_df.groupby("category_name").size().rename("count").reset_index()
-    #%%
-
-    train_obj_count_plot = px.bar(train_category_count_df, x="category_name", y="count",
-                                title="Category Distribution in Train Set",
-                                template="plotly_dark", color="category_name",
-                                color_discrete_sequence=px.colors.qualitative.Plotly,
-                                    labels={"category_name": "Category", "count": "Count"},
-                                    text="count", 
-                                )
-
-    #%%
+    # #%%
 
 
 
-    train_obj_count_plot.update_layout(showlegend=False, xaxis_tickangle=-45)
+    # train_obj_count_plot.update_layout(showlegend=False, xaxis_tickangle=-45)
 
 
 
-    train_obj_count_plot = plot_bar(train_category_count_df, 
-                                x="category_name", y="count",
-                                    )
-                                #title="Category Distribution in Train Set"
+    # train_obj_count_plot = plot_bar(train_category_count_df, 
+    #                             x="category_name", y="count",
+    #                                 )
+    #                             #title="Category Distribution in Train Set"
 
-    val_obj_plot = plot_bar(val_category_count_df, 
-                            x="category_name", y="count",
-                            #title="Category Distribution in Val Set"
-                            )
-    test_obj_plot = plot_bar(test_category_count_df, 
-                            x="category_name", y="count",
-                            #title="Category Distribution in Test Set"
-                            )
+    # val_obj_plot = plot_bar(val_category_count_df, 
+    #                         x="category_name", y="count",
+    #                         #title="Category Distribution in Val Set"
+    #                         )
+    # test_obj_plot = plot_bar(test_category_count_df, 
+    #                         x="category_name", y="count",
+    #                         #title="Category Distribution in Test Set"
+    #                         )
 
 
     #%%
@@ -2556,62 +2545,59 @@ if __name__ == "__main__":
     #%%
 
     #%%
-    splits_obj_barplots = {
-            "Train  Set": train_obj_count_plot,
-            "Val  Set": val_obj_plot,
-            "Test  Set": test_obj_plot
-        }
+    # splits_obj_barplots = {
+    #         "Train  Set": train_obj_count_plot,
+    #         "Val  Set": val_obj_plot,
+    #         "Test  Set": test_obj_plot
+    #     }
 
 
     #%%
 
-    split_bar_plot = make_split_plot(splits_obj_barplots, 
-                                     rows=1,
-                                    cols=3,
-                                    height=700,
-                                    width=1000,
-                                    )
+    # split_bar_plot = make_split_plot(splits_obj_barplots, 
+    #                                  rows=1,
+    #                                 cols=3,
+    #                                 height=700,
+    #                                 width=1000,
+    #                                 )
 
-    #%%
-
-    split_bar_plot
 
 
     #%%
-    train_val_xbins = compute_bins(reference_distribution=train_df, 
-                            comparison_distribution=val_df,
-                            field_to_bin="relative_x_center", strategy="equal",
-                            n_bins=10
-                            )
+    # train_val_xbins = compute_bins(reference_distribution=train_df, 
+    #                         comparison_distribution=val_df,
+    #                         field_to_bin="relative_x_center", strategy="equal",
+    #                         n_bins=10
+    #                         )
 
-    train_val_ybins = compute_bins(reference_distribution=train_df, 
-                            comparison_distribution=val_df,
-                            field_to_bin="relative_y_center", strategy="equal",
-                            n_bins=10
-                            )
+    # train_val_ybins = compute_bins(reference_distribution=train_df, 
+    #                         comparison_distribution=val_df,
+    #                         field_to_bin="relative_y_center", strategy="equal",
+    #                         n_bins=10
+    #                         )
 
 
-    train_test_xbins = compute_bins(reference_distribution=train_df, 
-                            comparison_distribution=test_df,
-                            field_to_bin="relative_x_center", strategy="equal",
-                            n_bins=10
-                            )
-    train_test_ybins = compute_bins(reference_distribution=train_df, 
-                            comparison_distribution=test_df,
-                            field_to_bin="relative_y_center", strategy="equal",
-                            n_bins=10
-                            )
+    # train_test_xbins = compute_bins(reference_distribution=train_df, 
+    #                         comparison_distribution=test_df,
+    #                         field_to_bin="relative_x_center", strategy="equal",
+    #                         n_bins=10
+    #                         )
+    # train_test_ybins = compute_bins(reference_distribution=train_df, 
+    #                         comparison_distribution=test_df,
+    #                         field_to_bin="relative_y_center", strategy="equal",
+    #                         n_bins=10
+    #                         )
 
-    val_test_xbins = compute_bins(reference_distribution=val_df, 
-                            comparison_distribution=test_df,
-                            field_to_bin="relative_x_center", strategy="equal",
-                            n_bins=10
-                            )
-    val_test_ybins = compute_bins(reference_distribution=val_df, 
-                            comparison_distribution=test_df,
-                            field_to_bin="relative_y_center", strategy="equal",
-                            n_bins=10
-                            )
+    # val_test_xbins = compute_bins(reference_distribution=val_df, 
+    #                         comparison_distribution=test_df,
+    #                         field_to_bin="relative_x_center", strategy="equal",
+    #                         n_bins=10
+    #                         )
+    # val_test_ybins = compute_bins(reference_distribution=val_df, 
+    #                         comparison_distribution=test_df,
+    #                         field_to_bin="relative_y_center", strategy="equal",
+    #                         n_bins=10
+    #                         )
     #%%
 
     import numpy as np 
@@ -2620,76 +2606,76 @@ if __name__ == "__main__":
 
     #%%
 
-    train_heatmap, train_xedges, train_yedges = np.histogram2d(train_df["relative_x_center"],
-                                                                train_df["relative_y_center"],
-                                                                #bins=10,
-                                                                range=[[0, 1], [0, 1]],
-                                                                bins=[train_val_xbins, train_val_ybins], 
-                                                                )
+    # train_heatmap, train_xedges, train_yedges = np.histogram2d(train_df["relative_x_center"],
+    #                                                             train_df["relative_y_center"],
+    #                                                             #bins=10,
+    #                                                             range=[[0, 1], [0, 1]],
+    #                                                             bins=[train_val_xbins, train_val_ybins], 
+    #                                                             )
 
-    #%%
+    # #%%
 
-    train_heatmap #.shape
+    # train_heatmap #.shape
 
-    #%%
+    # #%%
 
-    train_xedges.shape
+    # train_xedges.shape
 
-    #%%
+    # #%%
 
-    train_yedges#.shape
+    # train_yedges#.shape
 
-    #%%
-    train_heatmap_proba = train_heatmap / train_heatmap.sum()
-    train_heatmap_proba#.sum()#.shape
-    #%%
+    # #%%
+    # train_heatmap_proba = train_heatmap / train_heatmap.sum()
+    # train_heatmap_proba#.sum()#.shape
+    # #%%
 
-    (train_heatmap / train_heatmap.sum()).sum(axis=1)#.shape
+    # (train_heatmap / train_heatmap.sum()).sum(axis=1)#.shape
 
-    #%%
-    train_df["relative_x_center"].min(), train_df["relative_x_center"].max()
+    # #%%
+    # train_df["relative_x_center"].min(), train_df["relative_x_center"].max()
 
-    #%%
-    train_df["relative_y_center"].min(), train_df["relative_y_center"].max()
-
-
-    #%%
-
-    val_heatmap, val_xedges, val_yedges = np.histogram2d(val_df["relative_x_center"],
-                                            val_df["relative_y_center"],
-                                            #bins=10,
-                                            #range=[[0, 1], [0, 1]],    
-                                        )
-
-    #%%
-
-    val_heatmap.ravel()
-
-    val_heatmap_proba = val_heatmap / val_heatmap.sum()
+    # #%%
+    # train_df["relative_y_center"].min(), train_df["relative_y_center"].max()
 
 
-    #%%
+    # #%%
 
-    jensenshannon(train_heatmap_proba.ravel(), val_heatmap_proba.ravel())**2
+    # val_heatmap, val_xedges, val_yedges = np.histogram2d(val_df["relative_x_center"],
+    #                                         val_df["relative_y_center"],
+    #                                         #bins=10,
+    #                                         #range=[[0, 1], [0, 1]],    
+    #                                     )
 
-    #%%
+    # #%%
 
-    x_centers = (train_xedges[:-1] + train_xedges[1:]) * 0.5
-    x_centers
+    # val_heatmap.ravel()
 
-    #%%
+    # val_heatmap_proba = val_heatmap / val_heatmap.sum()
 
-    y_centers = (train_yedges[:-1] + train_yedges[1:]) * 0.5
-    y_centers
 
-    #%%
+    # #%%
 
-    X, Y =np.meshgrid(x_centers, y_centers, indexing="ij")
+    # jensenshannon(train_heatmap_proba.ravel(), val_heatmap_proba.ravel())**2
 
-    #%%
+    # #%%
 
-    support = np.stack([X.ravel(), Y.ravel()], axis=1)
-    support.shape
+    # x_centers = (train_xedges[:-1] + train_xedges[1:]) * 0.5
+    # x_centers
+
+    # #%%
+
+    # y_centers = (train_yedges[:-1] + train_yedges[1:]) * 0.5
+    # y_centers
+
+    # #%%
+
+    # X, Y =np.meshgrid(x_centers, y_centers, indexing="ij")
+
+    # #%%
+
+    # support = np.stack([X.ravel(), Y.ravel()], axis=1)
+    # support.shape
     #%%
 
     # wasserstein_distance_nd(train_xedges, train_yedges,
@@ -2704,69 +2690,69 @@ if __name__ == "__main__":
 
     #%%
 
-    train_spatial = compute_spatial_distribution(train_df, 
-                                                bins=[train_val_xbins, train_val_ybins]
-                                                )
-    val_spatial = compute_spatial_distribution(val_df, 
-                                            bins=[train_val_xbins, train_val_ybins])
-    test_spatial = compute_spatial_distribution(test_df, 
-                                                bins=[train_test_xbins, train_test_ybins]
-                                                )
+    # train_spatial = compute_spatial_distribution(train_df, 
+    #                                             bins=[train_val_xbins, train_val_ybins]
+    #                                             )
+    # val_spatial = compute_spatial_distribution(val_df, 
+    #                                         bins=[train_val_xbins, train_val_ybins])
+    # test_spatial = compute_spatial_distribution(test_df, 
+    #                                             bins=[train_test_xbins, train_test_ybins]
+    #                                             )
 
     #%%
-    train_spatial
+    #train_spatial
 
     #%%
-    train_val_spatial_drift = compute_spatial_drift(train_spatial, val_spatial)
-    train_val_spatial_drift
+    # train_val_spatial_drift = compute_spatial_drift(train_spatial, val_spatial)
+    # train_val_spatial_drift
 
-    #%%
+    # #%%
 
-    train_test_spatial_drift = compute_spatial_drift(train_spatial, test_spatial)
-    train_test_spatial_drift
+    # train_test_spatial_drift = compute_spatial_drift(train_spatial, test_spatial)
+    # train_test_spatial_drift
 
-    #%%
+    # #%%
 
-    val_test_spatial_drift = compute_spatial_drift(val_spatial, test_spatial)
-    val_test_spatial_drift
+    # val_test_spatial_drift = compute_spatial_drift(val_spatial, test_spatial)
+    # val_test_spatial_drift
 
 
 
-    #%%
+    # #%%
 
-    #%%
+    # #%%
 
-    train_val_heatmap = plot_spatial_heatmaps(train_spatial, val_spatial, 
-                                              names=("Train", "Val"),
-                                             title_text="Probability distribution heatmap for relative object centers"
+    # train_val_heatmap = plot_spatial_heatmaps(train_spatial, val_spatial, 
+    #                                           names=("Train", "Val"),
+    #                                          title_text="Probability distribution heatmap for relative object centers"
                                               
-                                              )
-    train_val_heatmap
-    #%%
+    #                                           )
+    # train_val_heatmap
+    # #%%
 
-    train_test_heatmap = plot_spatial_heatmaps(train_spatial, test_spatial, 
-                                               names=("Train", "Test"),
-                                             title_text="Probability distribution heatmap for relative object centers"
-                                               )
-    train_test_heatmap
-    #%%
+    # train_test_heatmap = plot_spatial_heatmaps(train_spatial, test_spatial, 
+    #                                            names=("Train", "Test"),
+    #                                          title_text="Probability distribution heatmap for relative object centers"
+    #                                            )
+    # train_test_heatmap
+    # #%%
 
-    val_test_heatmap = plot_spatial_heatmaps(val_spatial, test_spatial, 
-                                             names=("Val", "Test"),
-                                             title_text="Probability distribution heatmap for relative object centers"
-                                             ) 
-    val_test_heatmap
-    #%%
+    # val_test_heatmap = plot_spatial_heatmaps(val_spatial, test_spatial, 
+    #                                          names=("Val", "Test"),
+    #                                          title_text="Probability distribution heatmap for relative object centers"
+    #                                          ) 
+    # val_test_heatmap
+    # #%%
 
-    #%%
+    # #%%
 
-    train_val_quadrant_drift = compute_quadrant_drift(train_spatial, val_spatial)
-    train_val_quadrant_drift
+    # train_val_quadrant_drift = compute_quadrant_drift(train_spatial, val_spatial)
+    # train_val_quadrant_drift
 
-    #%%
+    # #%%
 
-    train_test_quadrant_drift = compute_quadrant_drift(train_spatial, test_spatial)
-    train_test_quadrant_drift
+    # train_test_quadrant_drift = compute_quadrant_drift(train_spatial, test_spatial)
+    # train_test_quadrant_drift
     
 
     #%%
@@ -2782,11 +2768,11 @@ if __name__ == "__main__":
     
     
     #%%
-    train_val_drift_content = generate_data_metric_section(metric_heading="Data Drift Detection on Data Attributes",
-                                                            fig=train_val_drift_radar_plot, #val_test_heatmap, #drift_radar_plot,
-                                                            subheading="Jensen Shannon Divergence on Train vs Val Distribution",
-                                                            footnote="Score > 0.05 indicates statistically significant drift",
-                                                            )
+    # train_val_drift_content = generate_data_metric_section(metric_heading="Data Drift Detection on Data Attributes",
+    #                                                         fig=train_val_drift_radar_plot, #val_test_heatmap, #drift_radar_plot,
+    #                                                         subheading="Jensen Shannon Divergence on Train vs Val Distribution",
+    #                                                         footnote="Score > 0.05 indicates statistically significant drift",
+    #                                                         )
     
     
     #%%
@@ -2797,42 +2783,42 @@ if __name__ == "__main__":
     
     #%%
     
-    train_test_drift_content = generate_data_metric_section(metric_heading="",
-                                                            fig=train_test_drift_radar_plot, #drift_radar_plot,
-                                                            subheading="Jensen Shannon Divergence on Train vs Test Distribution",
-                                                            footnote="Score > 0.05 indicates statistically significant drift",
-                                                            )
+    # train_test_drift_content = generate_data_metric_section(metric_heading="",
+    #                                                         fig=train_test_drift_radar_plot, #drift_radar_plot,
+    #                                                         subheading="Jensen Shannon Divergence on Train vs Test Distribution",
+    #                                                         footnote="Score > 0.05 indicates statistically significant drift",
+    #                                                         )
     
     
-    #%%
+    # #%%
     
-    val_test_drift_content = generate_data_metric_section(metric_heading="",
-                                                        fig=val_test_drift_radar_plot, #drift_radar_plot,
-                                                        subheading="Jensen Shannon Divergence on Val vs Test Distribution",
-                                                        footnote="Score > 0.05 indicates statistically significant drift",
-                                                        )
+    # val_test_drift_content = generate_data_metric_section(metric_heading="",
+    #                                                     fig=val_test_drift_radar_plot, #drift_radar_plot,
+    #                                                     subheading="Jensen Shannon Divergence on Val vs Test Distribution",
+    #                                                     footnote="Score > 0.05 indicates statistically significant drift",
+    #                                                     )
     
-    #%%
+    # #%%
     
-    #%%  heatmap content
+    # #%%  heatmap content
     
-    train_val_spatial_drift_content = generate_data_metric_section(metric_heading="", 
-                                                                    fig=train_val_heatmap, 
-                                                                    subheading=f"Spatial Drift: Relative Object Centers - Train vs Val", 
-                                                                    footnote=f"Jensen Shannon Divergence: {train_val_spatial_drift['js_2d']: .3f} | Wasserstein: {train_val_spatial_drift['w1_2d']: .3f}"  
-                                                                    )
+    # train_val_spatial_drift_content = generate_data_metric_section(metric_heading="", 
+    #                                                                 fig=train_val_heatmap, 
+    #                                                                 subheading=f"Spatial Drift: Relative Object Centers - Train vs Val", 
+    #                                                                 footnote=f"Jensen Shannon Divergence: {train_val_spatial_drift['js_2d']: .3f} | Wasserstein: {train_val_spatial_drift['w1_2d']: .3f}"  
+    #                                                                 )
     
-    train_test_spatial_drift_content = generate_data_metric_section(metric_heading="",
-                                                                    fig=train_test_heatmap, 
-                                                                    subheading=f"Spatial Drift: Relative Object Centers - Train vs Test", 
-                                                                    footnote=f"Jensen Shannon Divergence: {train_test_spatial_drift['js_2d']: .3f} | Wasserstein: {train_test_spatial_drift['w1_2d']: .3f}" 
-                                                                    )
+    # train_test_spatial_drift_content = generate_data_metric_section(metric_heading="",
+    #                                                                 fig=train_test_heatmap, 
+    #                                                                 subheading=f"Spatial Drift: Relative Object Centers - Train vs Test", 
+    #                                                                 footnote=f"Jensen Shannon Divergence: {train_test_spatial_drift['js_2d']: .3f} | Wasserstein: {train_test_spatial_drift['w1_2d']: .3f}" 
+    #                                                                 )
     
-    val_test_spatial_drift_content = generate_data_metric_section(metric_heading="",
-                                                                    fig=val_test_heatmap, 
-                                                                    subheading=f"Spatial Drift: Relative Object Centers - Val vs Test", 
-                                                                    footnote=f"Jensen Shannon Divergence: {val_test_spatial_drift['js_2d']: .3f} | Wasserstein: {val_test_spatial_drift['w1_2d']: .3f}"  
-                                                                    )
+    # val_test_spatial_drift_content = generate_data_metric_section(metric_heading="",
+    #                                                                 fig=val_test_heatmap, 
+    #                                                                 subheading=f"Spatial Drift: Relative Object Centers - Val vs Test", 
+    #                                                                 footnote=f"Jensen Shannon Divergence: {val_test_spatial_drift['js_2d']: .3f} | Wasserstein: {val_test_spatial_drift['w1_2d']: .3f}"  
+    #                                                                 )
     
     #%% Histogram distribution
     
@@ -3114,16 +3100,19 @@ if __name__ == "__main__":
                                                             section=wider_summary_table_fig_base64
                                                             )
     dataspace_metrics = create_section_head(header="Data Space Metrics",
-                                            section=drift_contents
+                                            section=drift_scene_section, #'drift_contents
                                             )
     motivation_section = create_section_head(header="Motivation and Intended Use",
                                              section=moti_content
                                              )
     #%%
-    joined_section = "\n".join([title, authorship_section, 
+    joined_section = "\n".join([title, 
+                                authorship_section, 
                                 motivation_section, # moti_content, 
                                 data_overview,
-                                data_collection_section, labelling_section, split_section,
+                                data_collection_section, 
+                                labelling_section, 
+                                split_section,
                                 wider_summary_statistics_section, #summary_statistics, #summary_stat_section, 
                                 dataspace_metrics, #drift_contents, 
                                 transformation_section,
