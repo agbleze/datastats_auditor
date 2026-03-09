@@ -1447,10 +1447,294 @@ def compute_quadrant_drift(spatial_A, spatial_B):
         "l1_quadrant": l1_quad,
     }
 
+import uuid
 
 
+def create_data_overview(split_dfs: dict, name, id= str(uuid.uuid1())):
+    num_images = {split_nm: df.image_id.nunique() for split_nm, df in 
+                    split_dfs.items()
+                    }
+    split_obj_num = {split_nm: df.category_id.count() for split_nm, df in 
+                    split_dfs.items()
+                    }
+    all_categories = []
+    
+    for split_nm, df in split_dfs.items():
+        all_categories.extend(list(df.category_name.unique()))
+    all_categories = set(all_categories)
+    
+    summary_kwargs = {#"header": "1. Summary",
+                        "Name": name,
+                        "Version ID": id,
+                        "Modality": "Image",
+                        "Number of images": num_images,
+                        "Objects labeled": all_categories, #["cocoa", "tomato", "coconut"],
+                        "Object counts per split": split_obj_num #{"train": 123, "val": 23, "test": 56}
+                        }
+    return summary_kwargs
 
 
+def create_section_head(**kwargs):
+    header = kwargs.get("header", "")
+    header = f"{header}" if header else ""
+    #sect_content = "\n".join([f"- {key}: {value}" for key, value in kwargs.items() if key != "header"])
+    section_content = kwargs.get("section", "")
+    section = f""" 
+<H1 style="color:#2A7FFF; font-weight:bold;">
+ {header}
+</H1>
+
+{section_content}
+    
+    """
+    return section.strip()
+    
+    
+from markdown import markdown
+from weasyprint import HTML
+    
+def write_md_to_pdf(markdown_content: str, pdf_path: str):
+    html = markdown(markdown_content, output_format="html5")
+    HTML(string=html).write_pdf(pdf_path)
+        
+
+import base64
+    
+def fig_to_base64(fig):
+    img_bytes = fig.to_image(format="png")
+    return base64.b64encode(img_bytes).decode("utf-8")
+    
+
+def generate_data_metric_section(metric_heading, 
+                                    fig,
+                                subheading="", 
+                                footnote="",
+                                ):
+    img_b64 = fig_to_base64(fig)
+    img_md = f"![splits](data:image/png;base64,{img_b64})"
+
+    md_content = f"""## {metric_heading}
+    
+    
+### {subheading}
+
+
+{img_md}
+
+
+{footnote}
+    """
+    return md_content
+
+
+def get_drift_result_as_df(drift_results, 
+                            distribution_pair: str = "('train', 'val')",
+                            property_field_name: str = "property",
+                            metric_name: str = "js"
+                            ):
+    drift_results.keys()
+    drift_property = []
+    drift_metric = []
+    for k, v in drift_results.items():
+        if k.startswith(distribution_pair) and k.endswith(metric_name):
+            drift_property.append(v[property_field_name])
+            drift_metric.append(v[metric_name])
+            
+    drift_dict = {"scores": drift_metric, 
+                    "property": drift_property
+                    }
+    df = pd.DataFrame(drift_dict)
+    return df
+        
+                
+def create_scene_composition_section(scene_results, 
+                                        data_properites=["occupancy_per_image",
+                                                        "relative_bbox_area",
+                                                        "bbox_aspect_ratio"
+                                                        ],
+                                        ):
+    contents_list = []
+    for idx, prop in enumerate(data_properites):
+        heading = "Scene composition" if idx == 0 else ""
+        fig = scene_results[prop]
+        _ = prop if prop in scene_properties else f"{prop} per Object"
+        scene_content = generate_data_metric_section(metric_heading=heading,
+                                                    fig=fig,
+                                                    subheading=f"Distribution of {prop}", 
+                                                    footnote=f""  
+                                                    )
+        contents_list.append(scene_content)
+    scene_contents = "\n".join([i for i in contents_list])
+    return scene_contents
+        
+
+def create_drift_section(drift_result, metric_used="Jensen Shannon Divergence",
+                            drift_key='js_2d', 
+                            
+                            ):
+    section_list = []
+    drift_plot = drift_result["drift_plot"]
+    drift_spatial_heatmap = drift_result["spatial_heatmap"]
+    spatial_drift = drift_result['spatial_drift']
+    for idx, (distr_pair, fig) in enumerate(drift_plot.items()):
+        heading = "Data Drift Detection on Data Attributes" if idx == 0 else ""
+        
+        sec = generate_data_metric_section(metric_heading=heading,
+                                    fig=fig,
+                                    subheading=f"{metric_used} on {distr_pair} Distribution",
+                                    footnote="Score > 0.05 indicates statistically significant drift",
+                                    )
+        section_list.append(sec)
+    
+    for idx, (distr_pair, fig) in enumerate(drift_spatial_heatmap.items()):
+        pair_spatial_dirft = spatial_drift[distr_pair]
+        spatial_drift_content = generate_data_metric_section(metric_heading="", 
+                                                                        fig=train_val_heatmap, 
+                                                                        subheading=f"Spatial Drift: Relative Object Centers - {distr_pair}", 
+                                                                        footnote=f"{metric_used}: {pair_spatial_dirft[drift_key]: .3f} | Wasserstein: {pair_spatial_dirft['w1_2d']: .3f}"  
+                                                                        )
+        section_list.append(spatial_drift_content)
+    
+    drift_section_content = "\n".join([i for i in section_list])
+    return drift_section_content
+
+
+def plot_table(df, cells_colname, header_colname='index', **kwargs):
+    tab_fig = go.Figure(data=[go.Table(
+    header=dict(values=list(df[header_colname].values.tolist()),
+                fill_color='paleturquoise',
+                align='left'),
+    cells=dict(values=df[cells_colname].values.tolist(),
+            fill_color=kwargs.get('fill_color', 'lavender'),
+            align=kwargs.get('align','left')
+            ))
+            ])
+    
+    
+    tab_fig.update_layout(title=kwargs.get("title", "Summary Statistics"), 
+                            height=kwargs.get("height", 100), 
+                            width=kwargs.get("width", 550), 
+                            margin=kwargs.get("margin", dict(l=10, r=10, t=40, b=10)), 
+                            template=kwargs.get("template"),
+                            )
+    return tab_fig
+
+
+def plot_histogram(df, **kwargs):
+    fig = px.histogram(df, x=kwargs.get("x"), 
+                        histnorm=kwargs.get("histnorm"), #"probability",
+                        title=kwargs.get("title"), #"Distribution of Relative BBox Area by Split",
+                        template=kwargs.get("template", "plotly_dark"),
+                        color=kwargs.get("color"),
+                        facet_col=kwargs.get("facet_col"),
+                        facet_row=kwargs.get("facet_row"),
+                        facet_col_spacing=kwargs.get("facet_col_spacing", 0.1),
+                        height=kwargs.get("height", 800),
+                        width=kwargs.get("width",800),
+                        barmode=kwargs.get("barmode", "relative"),
+                        
+                        )
+    return fig    
+
+
+import plotly.graph_objects as go
+    
+def compute_column_widths(df, min_width=80, max_width=300):
+    widths = []
+    for col in df.columns:
+        values = df[col].astype(str)
+        max_len = max([len(col)] + [len(v) for v in values])
+        width = max(min_width, min(max_width, max_len * 9))
+        widths.append(width)
+    return widths
+
+
+def plot_summary_table(df, title="Summary Statistics", **kwargs):
+    columns = list(df.columns[::-1])
+    col_widths = compute_column_widths(df=df)[::-1]
+    fig = go.Figure(data=[go.Table(columnwidth=col_widths,
+                            header=dict(values=columns,
+                                        fill_color="#1f2c56",
+                                        font=dict(color="white", size=12),
+                                        align="left"
+                                        ),
+                            cells=dict(values=[df[col] for col in columns], 
+                                        fill_color="#2d3e6b",
+                                        font=dict(color="white", size=11),
+                                        align="left",
+                                    )
+                            )
+                        ]
+                    )
+
+    fig.update_layout(title=kwargs.get("title", title),
+                        height=kwargs.get("height"),
+                        width=kwargs.get("width", 700),
+                        margin=kwargs.get("margin",dict(l=10, r=10, t=40, b=10)),
+                        template=kwargs.get("template","plotly_dark")
+                    )
+
+    return fig
+    
+
+def compute_summary_stats_wider(result, properties=["relative_bbox_area",
+                                                "bbox_aspect_ratio",
+                                                "num_bboxes_per_image"
+                                                ],
+                              **kwargs
+                            ):
+    stats = ["mean", "min", "max", "median", "std", "skew", "kurt"]
+    split_dfs = result['split_dfs']
+    stats_df_list = []
+    for split_nm, split_df in split_dfs.items():
+        for col in properties:
+            df = compute_stats(df=split_df, prop=col, 
+                            group=kwargs.get("group"),
+                            stats=kwargs.get("stats", stats)
+                                )
+            df = df.set_index("index").T
+            df = df.round(kwargs.get("round", 5))
+            df["attribute"] = f"{split_nm}_{df.index[0]}"
+            stats_df_list.append(df)
+    summary_stat_df = pd.concat(stats_df_list)
+    return summary_stat_df
+    
+    
+class SummaryTablePlot:
+    def __init__(self, summary_result, distribution_names,
+                    property_names, **kwargs
+                    ):
+        self.summary_result = summary_result
+        if isinstance(distribution_names, str):
+            distribution_names = [distribution_names]
+        
+        if isinstance(property_names, str):
+            property_names = [property_names]
+            
+        self.distribution_names = distribution_names
+        
+        self.property_names = property_names
+        self.kwargs = kwargs
+        
+    def create_tables(self):
+        result = {}
+        for dist_nm in self.distribution_names:
+            prop_tables = {}
+            dist_sumr = self.summary_result[dist_nm]
+            
+            for prop in self.property_names:
+                df = dist_sumr[prop]
+                title = f"Summary Statistics of {prop}".capitalize()
+                table = plot_table(df=df,
+                                    cells_colname=prop,
+                                    title=self.kwargs.get("title", title),
+                                    **self.kwargs
+                                    )
+                prop_tables[prop] = table
+            result[dist_nm] = prop_tables
+        return result
+        
+                            
 def create_dataset_card(df: pd.DataFrame, output_path: str = "DATASET_CARD.md"):
     """
     Generate a dataset card summarizing dataset metadata and computed data-centric ML metrics.
@@ -1802,27 +2086,7 @@ if __name__ == "__main__":
     
     #%%
     
-    def compute_summary_stats_wider(result, properties=["relative_bbox_area",
-                                                "bbox_aspect_ratio",
-                                                "num_bboxes_per_image"
-                                                ],
-                              **kwargs
-                            ):
-        stats = ["mean", "min", "max", "median", "std", "skew", "kurt"]
-        split_dfs = result['split_dfs']
-        stats_df_list = []
-        for split_nm, split_df in split_dfs.items():
-            for col in properties:
-                df = compute_stats(df=split_df, prop=col, 
-                                group=kwargs.get("group"),
-                                stats=kwargs.get("stats", stats)
-                                    )
-                df = df.set_index("index").T
-                df = df.round(kwargs.get("round", 5))
-                df["attribute"] = f"{split_nm}_{df.index[0]}"
-                stats_df_list.append(df)
-        summary_stat_df = pd.concat(stats_df_list)
-        return summary_stat_df
+    
             
         
     #%%
@@ -1834,44 +2098,7 @@ if __name__ == "__main__":
     
     
     #%%
-    import plotly.graph_objects as go
     
-    def compute_column_widths(df, min_width=80, max_width=300):
-        widths = []
-        for col in df.columns:
-            values = df[col].astype(str)
-            max_len = max([len(col)] + [len(v) for v in values])
-            width = max(min_width, min(max_width, max_len * 9))
-            widths.append(width)
-        return widths
-    
-
-    def plot_summary_table(df, title="Summary Statistics", **kwargs):
-        columns = list(df.columns[::-1])
-        col_widths = compute_column_widths(df=df)[::-1]
-        fig = go.Figure(data=[go.Table(columnwidth=col_widths,
-                                header=dict(values=columns,
-                                            fill_color="#1f2c56",
-                                            font=dict(color="white", size=12),
-                                            align="left"
-                                            ),
-                                cells=dict(values=[df[col] for col in columns], 
-                                            fill_color="#2d3e6b",
-                                            font=dict(color="white", size=11),
-                                            align="left",
-                                        )
-                                )
-                            ]
-                        )
-
-        fig.update_layout(title=kwargs.get("title", title),
-                            height=kwargs.get("height"),
-                            width=kwargs.get("width", 700),
-                            margin=kwargs.get("margin",dict(l=10, r=10, t=40, b=10)),
-                            template=kwargs.get("template","plotly_dark")
-                        )
-
-        return fig
 
     #%% Example usage:
     wider_summary_table_fig = plot_summary_table(summary_stats_df, height=300)
@@ -1926,21 +2153,7 @@ if __name__ == "__main__":
                   
                   )
     #%%
-    def plot_histogram(df, **kwargs):
-        fig = px.histogram(df, x=kwargs.get("x"), 
-                            histnorm=kwargs.get("histnorm"), #"probability",
-                            title=kwargs.get("title"), #"Distribution of Relative BBox Area by Split",
-                            template=kwargs.get("template", "plotly_dark"),
-                            color=kwargs.get("color"),
-                            facet_col=kwargs.get("facet_col"),
-                            facet_row=kwargs.get("facet_row"),
-                            facet_col_spacing=kwargs.get("facet_col_spacing", 0.1),
-                            height=kwargs.get("height", 800),
-                            width=kwargs.get("width",800),
-                            barmode=kwargs.get("barmode", "relative"),
-                            
-                            )
-        return fig
+    
     
     #%%
     plot_histogram(df=full_split_df, x="relative_bbox_area",
@@ -2164,25 +2377,7 @@ if __name__ == "__main__":
     
     #%%
     
-    def plot_table(df, cells_colname, header_colname='index', **kwargs):
-        tab_fig = go.Figure(data=[go.Table(
-        header=dict(values=list(df[header_colname].values.tolist()),
-                    fill_color='paleturquoise',
-                    align='left'),
-        cells=dict(values=df[cells_colname].values.tolist(),
-                fill_color=kwargs.get('fill_color', 'lavender'),
-                align=kwargs.get('align','left')
-                ))
-                ])
-        
-        
-        tab_fig.update_layout(title=kwargs.get("title", "Summary Statistics"), 
-                              height=kwargs.get("height", 100), 
-                              width=kwargs.get("width", 550), 
-                              margin=kwargs.get("margin", dict(l=10, r=10, t=40, b=10)), 
-                                template=kwargs.get("template"),
-                                )
-        return tab_fig
+    
         
     #%%
     
@@ -2191,39 +2386,7 @@ if __name__ == "__main__":
                )
     
     #%%
-    class SummaryTablePlot:
-        def __init__(self, summary_result, distribution_names,
-                     property_names, **kwargs
-                     ):
-            self.summary_result = summary_result
-            if isinstance(distribution_names, str):
-                distribution_names = [distribution_names]
-            
-            if isinstance(property_names, str):
-                property_names = [property_names]
-                
-            self.distribution_names = distribution_names
-            
-            self.property_names = property_names
-            self.kwargs = kwargs
-            
-        def create_tables(self):
-            result = {}
-            for dist_nm in self.distribution_names:
-                prop_tables = {}
-                dist_sumr = self.summary_result[dist_nm]
-                
-                for prop in self.property_names:
-                    df = dist_sumr[prop]
-                    title = f"Summary Statistics of {prop}".capitalize()
-                    table = plot_table(df=df,
-                                        cells_colname=prop,
-                                        title=self.kwargs.get("title", title),
-                                        **self.kwargs
-                                        )
-                    prop_tables[prop] = table
-                result[dist_nm] = prop_tables
-            return result
+    
             
     #%%
     
@@ -2270,26 +2433,7 @@ if __name__ == "__main__":
                     showlegend=True
                     )
     #%%
-    def get_drift_result_as_df(drift_results, 
-                                distribution_pair: str = "('train', 'val')",
-                                property_field_name: str = "property",
-                                metric_name: str = "js"
-                                ):
-        drift_results.keys()
-        #drift_radar_data = {}
-        drift_property = []
-        drift_metric = []
-        for k, v in drift_results.items():
-            if k.startswith(distribution_pair) and k.endswith(metric_name):
-                drift_property.append(v[property_field_name])
-                drift_metric.append(v[metric_name])
-                
-        drift_dict = {"scores": drift_metric, 
-                      "property": drift_property
-                      }
-        df = pd.DataFrame(drift_dict)
-        return df
-            
+    
 
     #%%
     train_val_drift_df = get_drift_result_as_df(drift_results=drift_results["drift"],
@@ -2635,33 +2779,7 @@ if __name__ == "__main__":
 
 
     #%%
-    import base64
     
-    def fig_to_base64(fig):
-        img_bytes = fig.to_image(format="png")
-        return base64.b64encode(img_bytes).decode("utf-8")
-        
-    
-    def generate_data_metric_section(metric_heading, 
-                                     fig,
-                                    subheading="", 
-                                    footnote="",
-                                    ):
-        img_b64 = fig_to_base64(fig)
-        img_md = f"![splits](data:image/png;base64,{img_b64})"
-
-        md_content = f"""## {metric_heading}
-        
-        
-### {subheading}
-
-
-{img_md}
-
-
-{footnote}
-        """
-        return md_content
     
     #%%
     train_val_drift_content = generate_data_metric_section(metric_heading="Data Drift Detection on Data Attributes",
@@ -2672,37 +2790,10 @@ if __name__ == "__main__":
     
     
     #%%
-    def create_drift_section(drift_result, metric_used="Jensen Shannon Divergence",
-                             drift_key='js_2d', 
-                             
-                             ):
-        section_list = []
-        drift_plot = drift_result["drift_plot"]
-        drift_spatial_heatmap = drift_result["spatial_heatmap"]
-        spatial_drift = drift_result['spatial_drift']
-        for idx, (distr_pair, fig) in enumerate(drift_plot.items()):
-            heading = "Data Drift Detection on Data Attributes" if idx == 0 else ""
-            
-            sec = generate_data_metric_section(metric_heading=heading,
-                                        fig=fig,
-                                        subheading=f"{metric_used} on {distr_pair} Distribution",
-                                        footnote="Score > 0.05 indicates statistically significant drift",
-                                        )
-            section_list.append(sec)
-        
-        for idx, (distr_pair, fig) in enumerate(drift_spatial_heatmap.items()):
-            pair_spatial_dirft = spatial_drift[distr_pair]
-            spatial_drift_content = generate_data_metric_section(metric_heading="", 
-                                                                            fig=train_val_heatmap, 
-                                                                            subheading=f"Spatial Drift: Relative Object Centers - {distr_pair}", 
-                                                                            footnote=f"{metric_used}: {pair_spatial_dirft[drift_key]: .3f} | Wasserstein: {pair_spatial_dirft['w1_2d']: .3f}"  
-                                                                            )
-            section_list.append(spatial_drift_content)
-        
-        drift_section_content = "\n".join([i for i in section_list])
-        return drift_section_content
+    
         
     
+    drift_section = create_drift_section(drift_result=drift_results)
     
     #%%
     
@@ -2762,7 +2853,10 @@ if __name__ == "__main__":
                         'relative_bbox_area_variance_per_image',
         
     ]
-    histplot_cls = HistPlot(df=full_split_df, property_names=scene_properties,
+    histplot_cls = HistPlot(df=full_split_df, 
+                            property_names=["relative_bbox_area", 'bbox_aspect_ratio',
+                                            'occupancy_per_image', 'num_bboxes_per_image',
+                                            ], #scene_properties,
                          facet_row="split_type",
                          height=500, width=700,
                          )
@@ -2770,16 +2864,16 @@ if __name__ == "__main__":
     
     #%%
     
-    obj_hist_cls = HistPlot(df=full_split_df, property_names=hist_props,
-                         color="category_name", 
-                         barmode="stack",
-                         facet_row="split_type",
-                         height=500, width=700,
-                         )
-    obj_hist_figs = obj_hist_cls.create_histograms()
+    # obj_hist_cls = HistPlot(df=full_split_df, property_names=hist_props,
+    #                      color="category_name", 
+    #                      barmode="stack",
+    #                      facet_row="split_type",
+    #                      height=500, width=700,
+    #                      )
+    # obj_hist_figs = obj_hist_cls.create_histograms()
     
     #%%
-    hist_figs.update(obj_hist_figs)
+    #hist_figs.update(obj_hist_figs)
     
     #%%
     #hist_figs['foreground_union_area_per_image']#.keys()
@@ -2787,38 +2881,24 @@ if __name__ == "__main__":
     
     #%%
     
-    hist_fig_list = []
-    for prop, fig in hist_figs.items():
-        _ = prop if prop in scene_properties else f"{prop} per Object"
-        hist_content = generate_data_metric_section(metric_heading=f"Scene composition: Distribution of {_}",
-                                                    fig=fig,#[prop], 
-                                                    subheading=f"", 
-                                                    footnote=f""  
-                                                    )
-        hist_fig_list.append(hist_content)
+    # hist_fig_list = []
+    # for prop, fig in hist_figs.items():
+    #     _ = prop if prop in scene_properties else f"{prop} per Object"
+    #     hist_content = generate_data_metric_section(metric_heading=f"Scene composition: Distribution of {_}",
+    #                                                 fig=fig,#[prop], 
+    #                                                 subheading=f"", 
+    #                                                 footnote=f""  
+    #                                                 )
+    #     hist_fig_list.append(hist_content)
      
         
-    def create_scene_composition_section(scene_results, 
-                                         data_properites=["occupancy_per_image",
-                                                          "relative_bbox_area",
-                                                          "bbox_aspect_ratio"
-                                                          ],
-                                         ):
-        contents_list = []
-        for idx, prop in enumerate(data_properites):
-            heading = "Scene composition" if idx == 0 else ""
-            fig = scene_results[prop]
-            _ = prop if prop in scene_properties else f"{prop} per Object"
-            scene_content = generate_data_metric_section(metric_heading=heading,
-                                                        fig=fig,
-                                                        subheading=f"Distribution of {prop}", 
-                                                        footnote=f""  
-                                                        )
-            contents_list.append(scene_content)
-        scene_contents = "\n".join([i for i in contents_list])
-        return scene_contents
-        
     
+    
+    #%%
+    
+    scene_composition_section = create_scene_composition_section(hist_figs)
+    
+    drift_scene_section = "\n".join([i for i in [drift_section, scene_composition_section]])
     #%%
     
     object_bias_content = generate_data_metric_section(metric_heading=f"Object Balance per Split",
@@ -2826,18 +2906,18 @@ if __name__ == "__main__":
                                                         )
     
     #%%
-    drift_figs = [#object_bias_content, 
-                  train_val_drift_content, train_test_drift_content, val_test_drift_content,
-                    train_val_spatial_drift_content, train_test_spatial_drift_content,
-                    val_test_spatial_drift_content,
-                    ]
-    drift_figs.extend(hist_fig_list)
-    drift_contents = "\n".join([i for i in drift_figs
-                                ]
-                                )
+    # drift_figs = [#object_bias_content, 
+    #               train_val_drift_content, train_test_drift_content, val_test_drift_content,
+    #                 train_val_spatial_drift_content, train_test_spatial_drift_content,
+    #                 val_test_spatial_drift_content,
+    #                 ]
+    # drift_figs.extend(hist_fig_list)
+    # drift_contents = "\n".join([i for i in drift_figs
+    #                             ]
+    #                             )
     
     
-    drift_contents
+    # drift_contents
     
     #%%
     summary_fig_list = []
@@ -2918,30 +2998,7 @@ if __name__ == "__main__":
     #{split_nm: df.image_id.nunique() for split_nm, df in split_stats_res["split_dfs"].items()}
 
 
-    import uuid
-
-    def create_data_overview(split_dfs: dict, name, id= str(uuid.uuid1())):
-        num_images = {split_nm: df.image_id.nunique() for split_nm, df in 
-                      split_dfs.items()
-                      }
-        split_obj_num = {split_nm: df.category_id.count() for split_nm, df in 
-                        split_dfs.items()
-                        }
-        all_categories = []
-        
-        for split_nm, df in split_dfs.items():
-            all_categories.extend(list(df.category_name.unique()))
-        all_categories = set(all_categories)
-        
-        summary_kwargs = {#"header": "1. Summary",
-                            "Name": name,
-                            "Version ID": id,
-                            "Modality": "Image",
-                            "Number of images": num_images,
-                            "Objects labeled": all_categories, #["cocoa", "tomato", "coconut"],
-                            "Object counts per split": split_obj_num #{"train": 123, "val": 23, "test": 56}
-                            }
-        return summary_kwargs
+    
     # %%
     import uuid
 
@@ -3024,7 +3081,7 @@ if __name__ == "__main__":
                 "Data Split Composition": split_section,
                 "Data Overview": summary_stat_section,
                 #"Data Summary Statistics": summary_fig_content,  
-                "Data space metrics": drift_contents,
+                "Data space metrics": drift_scene_section, #drift_contents,
                 "Transformation": transformation_section,
                 "License & Usage": license_section
                         
@@ -3035,20 +3092,6 @@ if __name__ == "__main__":
 
     #%%
     
-    def create_section_head(**kwargs):
-        header = kwargs.get("header", "")
-        header = f"{header}" if header else ""
-        #sect_content = "\n".join([f"- {key}: {value}" for key, value in kwargs.items() if key != "header"])
-        section_content = kwargs.get("section", "")
-        section = f""" 
-<H1 style="color:#2A7FFF; font-weight:bold;">
- {header}
-</H1>
-
-{section_content}
-    
-    """
-        return section.strip()
     
     
     #%%
@@ -3098,13 +3141,7 @@ if __name__ == "__main__":
         
     #%%
     
-    from markdown import markdown
-    from weasyprint import HTML
-    
-    def write_md_to_pdf(markdown_content: str, pdf_path: str):
-        html = markdown(markdown_content, output_format="html5")
-        HTML(string=html).write_pdf(pdf_path)
-        
+   
     #%%
     write_md_to_pdf(joined_section, pdf_path="dataset_card_join_raw.pdf")
     
