@@ -2660,7 +2660,6 @@ if __name__ == "__main__":
 
 
 {footnote}
-        ---
         """
         return md_content
     
@@ -2927,7 +2926,37 @@ if __name__ == "__main__":
     #export_md_to_pdf(md=datacard_md)
     # %%
     
+    split_stats_res['image_stats'].train#.keys()
+    
+    #%%
+    
+    #{split_nm: df.image_id.nunique() for split_nm, df in split_stats_res["split_dfs"].items()}
 
+
+    import uuid
+
+    def create_data_overview(split_dfs: dict, name, id= str(uuid.uuid1())):
+        num_images = {split_nm: df.image_id.nunique() for split_nm, df in 
+                      split_dfs.items()
+                      }
+        split_obj_num = {split_nm: df.category_id.count() for split_nm, df in 
+                        split_dfs.items()
+                        }
+        all_categories = []
+        
+        for split_nm, df in split_dfs.items():
+            all_categories.extend(list(df.category_name.unique()))
+        all_categories = set(all_categories)
+        
+        summary_kwargs = {#"header": "1. Summary",
+                            "Name": name,
+                            "Version ID": id,
+                            "Modality": "Image",
+                            "Number of images": num_images,
+                            "Objects labeled": all_categories, #["cocoa", "tomato", "coconut"],
+                            "Object counts per split": split_obj_num #{"train": 123, "val": 23, "test": 56}
+                            }
+        return summary_kwargs
     # %%
     import uuid
 
@@ -2942,7 +2971,9 @@ if __name__ == "__main__":
                     "Object counts per split": {"train": 123, "val": 23, "test": 56}
                     }
 
-
+    summary_kwargs = create_data_overview(split_dfs=split_stats_res["split_dfs"], 
+                                          name="demo", id= str(uuid.uuid1())
+                                          )
     auth_kwargs = {"header": "Authorship & Ownership",
                     "Organization": "ORG",
                     "Industry": "TECH",
@@ -3038,6 +3069,9 @@ if __name__ == "__main__":
     #%%
     
     wider_summary_table_fig_base64 = fig_to_base64(wider_summary_table_fig)
+    wider_summary_table_fig_base64 = generate_data_metric_section(metric_heading="",
+                                                                  fig=wider_summary_table_fig
+                                                                  )
 
     #%%
     
