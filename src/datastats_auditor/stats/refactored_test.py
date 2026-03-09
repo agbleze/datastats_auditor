@@ -1,5 +1,8 @@
 
 import pandas as pd
+import uuid
+import plotly.express as px
+
 
 train_annfile = "/home/lin/codebase/tomato_disease_prediction/Tomato-pest&diseases-1/train/_annotations.coco.json"
 val_annfile = "/home/lin/codebase/tomato_disease_prediction/Tomato-pest&diseases-1/valid/_annotations.coco.json"
@@ -20,7 +23,8 @@ image_stats_kwargs = {"train": {"image_dir": train_imgdir},
                         "test": {"image_dir": test_imgdir}
                     }
 
-
+intended_tasks=["Object detection", "Fairness evaluation"]
+PDF_PATH = "dataset_card.pdf"
 #%%
 
 print(f"obj_stats_kwargs: {obj_stats_kwargs}")
@@ -218,19 +222,24 @@ def compute_stats_and_drift(object_stats_kwargs,
 
     drift_results = drift_suite_cls.drift_metrics() 
     
-    create_data_card(split_stats_result=split_stats_res,
-                     drift_result=drift_results
-                     )
+    if make_date_card:
+        create_data_card(split_stats_result=split_stats_res,
+                        drift_result=drift_results,
+                        version_id=kwargs.get("version_id", str(uuid.uuid1())),
+                        name=kwargs.get("name", "demo"),
+                        intended_objects=kwargs.get("intended_objects"),
+                        pdf_path=kwargs.get("pdf_path", PDF_PATH)
+                        )
     return {"split_stats_result": split_stats_res,
             "drift_results": drift_results
             }
 
+
 def create_data_card(split_stats_result,
                      drift_result,
                      version_id, name,
-                     intended_tasks=["Object detection", "Fairness evaluation"],
                      intended_objects=None,
-                     pdf_path="dataset_card_join_raw.pdf",
+                     pdf_path=PDF_PATH,
                      **kwargs
                     ):
     summary_stats_df = compute_summary_stats_wider(split_stats_result)
@@ -268,7 +277,7 @@ def create_data_card(split_stats_result,
     drift_scene_section = "\n".join([i for i in [drift_section, scene_composition_section]])
 
     intended_objects = list(full_split_df["category_name"].unique()) if intended_objects is None else intended_objects 
-    moti_content = build_motivations_and_use(intended_tasks=intended_tasks,
+    moti_content = build_motivations_and_use(intended_tasks=kwargs.get("intended_tasks", intended_tasks),
                                             intended_objects=intended_objects, #["Person", "Helmet", "Safety vest"],
                                             )
     object_bias_content = generate_data_metric_section(metric_heading=f"Object Balance per Split",
