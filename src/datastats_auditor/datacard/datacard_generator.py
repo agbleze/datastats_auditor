@@ -193,8 +193,6 @@ def create_data_card(split_stats_result,
                                                                     fig=wider_summary_table_fig
                                                                     )
 
-
-
     title = create_section_head(header="Data Card")
     data_overview = create_section_head(header="Data Overview",
                                         section=summary_section
