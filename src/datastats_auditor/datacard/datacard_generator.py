@@ -21,7 +21,11 @@ from datastats_auditor.datacard.utils import (compute_summary_stats_wider,
 from datastats_auditor.datacard.visualizer import (plot_summary_table,
                                                    plot_bar, HistPlot
                                                    )
-from datastats_auditor.datacard.constants import (PDF_PATH)
+from datastats_auditor.datacard.constants import (PDF_PATH, AUTHORSHIP,
+                                                  DATA_COLLECTION,
+                                                  LABELLING, LICENCE,
+                                                  TRANSFORMATION
+                                                  )
 
 
 
@@ -39,7 +43,6 @@ class DatasetCardCreator:
         
         if export_pdf:
             pdf_path = f"{output_path.split('.md')[0]}.pdf"
-            #os.path.join(Path(output_path).stem, ".pdf")
             export_md_to_pdf(md=self.text, save_path=pdf_path)
         return self.text
         
@@ -122,8 +125,6 @@ class MarkdownRenderer:
         return md
 
 
-
-
 def create_data_card(split_stats_result,
                      drift_result,
                      version_id, name,
@@ -181,12 +182,12 @@ def create_data_card(split_stats_result,
 
 
     summary_section = create_section(kwargs=summary_kwargs)
-    authorship_section = create_section(kwargs=auth_kwargs)
-    data_collection_section = create_section(kwargs=data_col_kwargs)
-    labelling_section = create_section(kwargs=labelling_kwargs)
+    authorship_section = create_section(kwargs=AUTHORSHIP)
+    data_collection_section = create_section(kwargs=DATA_COLLECTION)
+    labelling_section = create_section(kwargs=LABELLING)
     split_section = create_section(kwargs=split_kwargs)
     transformation_section = create_section(kwargs=trans_kwargs)
-    license_section = create_section(kwargs=licence_kwargs)
+    license_section = create_section(kwargs=LICENCE)
 
 
     wider_summary_table_fig_base64 = generate_data_metric_section(metric_heading="",
