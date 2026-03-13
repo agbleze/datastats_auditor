@@ -109,7 +109,7 @@ def make_split_plot(splits: dict, **kwargs):
     return fig
 
 
-def create_data_overview(split_dfs: dict, name, id= str(uuid.uuid1())):
+def create_data_overview(split_dfs: dict, name, id):
     num_images = {split_nm: df.image_id.nunique() for split_nm, df in 
                     split_dfs.items()
                     }
@@ -122,12 +122,11 @@ def create_data_overview(split_dfs: dict, name, id= str(uuid.uuid1())):
         all_categories.extend(list(df.category_name.unique()))
     all_categories = set(all_categories)
     
-    summary_kwargs = {#"header": "1. Summary",
-                        "Name": name,
+    summary_kwargs = {"Name": name,
                         "Version ID": id,
                         "Modality": "Image",
                         "Number of images": num_images,
-                        "Objects labeled": all_categories, #["cocoa", "tomato", "coconut"],
-                        "Object counts per split": split_obj_num #{"train": 123, "val": 23, "test": 56}
+                        "Objects labeled": all_categories, 
+                        "Object counts per split": split_obj_num 
                         }
     return summary_kwargs
