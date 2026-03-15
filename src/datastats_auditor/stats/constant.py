@@ -1,0 +1,1 @@
+VALID_BINNING_STRATEGY = ["quantile", "equal", "log"]
