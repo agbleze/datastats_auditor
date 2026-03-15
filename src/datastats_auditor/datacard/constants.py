@@ -1,6 +1,3 @@
-
-
-
 PDF_PATH = "datacard.pdf"
 
 AUTHORSHIP = {"header": "Authorship & Ownership",
@@ -38,4 +35,18 @@ TRANSFORMATION = {"header":"Transformation",
                 }
 
 
+METRICS = ["kl", "js"]
 
+FIELD_TO_BIN = ['relative_bbox_area', 'bbox_aspect_ratio',
+                'relative_x_center', 'relative_y_center',
+                'foreground_union_area_per_image',
+                'occupancy_per_image', 'background_area_per_image',
+                #'foreground_to_background_area_per_image', 
+                'background_area_norm',
+                #'foreground_occupancy_to_background_occupany', 
+                'num_bboxes_per_image',
+                'relative_bbox_area_variance_per_image'
+                ]
+
+INTENDED_TASKS = ["Object detection", "Fairness evaluation"]
+PDF_PATH = "dataset_card.pdf"
