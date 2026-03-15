@@ -20,7 +20,7 @@ class BaseSplitStatsComputerService(ABC):
         if cls.status not in cls.valid_status_values:
             raise ValueError(f"{cls.__name__} has invalid status '{cls.status}'. Valid values are {cls.valid_status_values}.")
 
-        registry.register(cls.scorer_name, cls, cls.status)
+        registry.register(cls.name, cls, cls.status)
         
     @abstractmethod
     def compute_stats(self, *args, **kwargs) -> List[float]:
