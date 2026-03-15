@@ -59,7 +59,7 @@ class DriftStatsComputer(BaseDrift):
             field_to_bin = self.field_to_bin
         if n_bins is None:
             n_bins = self.n_bins
-        #areas = self.df[field_name]#.clip(1e-9, 1.0)
+
         values = pd.concat([self.reference_distribution[field_to_bin], self.comparison_distribution[field_to_bin]])
         max_value = values.max()
         min_value = values.min()
