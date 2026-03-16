@@ -10,6 +10,9 @@ from itertools import combinations
 
 
 class DriftComputerService(BaseDriftComputerService):
+    name = "drift_computer_service"
+    status = "stable"
+    
     def __init__(self, drift_cls: BaseDrift, 
                  distributions: Dict[str, pd.DataFrame],
                 metrics: Union[str, List[str]],
