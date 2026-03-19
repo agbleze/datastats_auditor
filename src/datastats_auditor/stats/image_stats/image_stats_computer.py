@@ -8,7 +8,7 @@ class ImageStatsComputer(BaseImageStats):
     imagestats_name = "imagestats"
     status = "experimental"
     
-    def __init__(self, dataloader):
+    def __init__(self, dataloader, **kwargs):
         self.dataloader = dataloader
         
     def compute_image_stats(self, *args, **kwargs):
