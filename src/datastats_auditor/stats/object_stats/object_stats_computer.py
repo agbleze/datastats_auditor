@@ -10,7 +10,7 @@ class ObjectStatsComputer(BaseObjectStatsComputer):
     name = "objectstats_computer"
     status = "stable"
         
-    def __init__(self, coco_ann_df: pd.DataFrame, 
+    def __init__(*, self, coco_ann_df: pd.DataFrame, 
                  bins=None, n_bins=5, strategy="quantile", 
                  **kwargs
                  ):
