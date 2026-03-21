@@ -11,7 +11,7 @@ from itertools import combinations
 
 class DriftComputerService(BaseDriftComputerService):
     name = "drift_computer_service"
-    status = "stable"
+    status = "experimental"
     
     def __init__(self, drift_cls: BaseDrift, 
                  distributions: Dict[str, pd.DataFrame],
