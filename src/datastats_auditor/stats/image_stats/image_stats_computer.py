@@ -5,7 +5,7 @@ from .utils import compute_dataset_stats
 
 
 class ImageStatsComputer(BaseImageStats):
-    imagestats_name = "imagestats"
+    name = "imagestats"
     status = "experimental"
     
     def __init__(self, dataloader, **kwargs):
