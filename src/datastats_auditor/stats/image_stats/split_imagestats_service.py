@@ -4,22 +4,29 @@ from ..io.baseio import IterableDataset
 from typing import Literal
 from types import SimpleNamespace
 from ..entities import SplitStatsResult
+import os
 
 
 SplitImageStatsResult = SimpleNamespace()
 
 class SplitImageStatsComputerService(BaseImageStatsService):
-    name = "imagestat_service"
+    name = "imagestat"
     status = "stable"
     
-    
-    def __init__(self, image_stats_cls: BaseImageStats, 
-                 dataloader_cls: IterableDataset,
-                 dataloader_params
+    def __init__(self, imagestat_computer: BaseImageStats, 
+                 dataloader: IterableDataset,
+                 #dataloader_params,
+                 **kwargs
                  ):
-        self.image_stats_cls = image_stats_cls
-        self.dataloader_cls = dataloader_cls
-        self.dataloader_params = dataloader_params
+        self.image_stats_cls = imagestat_computer
+        self.dataloader_cls = dataloader
+        
+        self.dataloader_params = {k: v for k, v in kwargs.items() 
+                                    if isinstance(v, dict) and os.path.isdir(list(v.values())[0])
+                                    }
+        if not self.dataloader_params:
+            raise ValueError(f"Image directory was not provided")
+        #self.dataloader_params = dataloader_params
     
     def compute_split_image_stats(self): 
         for split_nm, split_param in self.dataloader_params.items():
