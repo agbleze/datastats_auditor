@@ -2,7 +2,7 @@
 from abc import ABC, abstractmethod
 from typing import Iterable, Protocol, Literal
 import pandas as pd
-
+from ..registry import registry
 
 class IterableDataset(ABC):
     name: str = "base_image_importer"
@@ -17,6 +17,7 @@ class IterableDataset(ABC):
                 raise NotImplementedError(f"{cls.__name__} requires definining a '{attr}' class attribute because it is a Subclass of IterableDataset.")
         if cls.status not in cls.valid_status_values:
             raise ValueError(f"{cls.__name__} has invalid status '{cls.status}'. Valid values are {cls.valid_status_values}.")
+        registry.register(cls.name, cls, cls.status)
         
     @abstractmethod
     def __iter__(self, *args, **kwargs) -> Iterable:
@@ -35,11 +36,11 @@ class BaseAnnotationDFImporter(ABC):
         super().__init_subclass__()
         for attr in cls.required:
             if attr not in cls.__dict__:
-                raise NotImplementedError(f"{cls.__name__} requires definining a '{attr}' class attribute because it is a Subclass of IteraBaseAnnotationDFImporterbleDataset.")
+                raise NotImplementedError(f"{cls.__name__} requires definining a '{attr}' class attribute because it is a Subclass of BaseAnnotationDFImporter.")
         if cls.status not in cls.valid_status_values:
             raise ValueError(f"{cls.__name__} has invalid status '{cls.status}'. Valid values are {cls.valid_status_values}.")
 
-        #registry.register(cls.scorer_name, cls, cls.status)
+        registry.register(cls.name, cls, cls.status)
         
     @abstractmethod
     def load(self, *args, **kwargs) -> pd.DataFrame:
