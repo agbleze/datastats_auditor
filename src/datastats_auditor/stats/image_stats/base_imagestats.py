@@ -8,7 +8,7 @@ from ..registry import registry
 class BaseImageStats(ABC):
     name: str = "base_imagestats"
     status: Literal["stable", "experimental"] = "stable"
-    required = ["imagestats_name", "status"]
+    required = ["name", "status"]
     valid_status_values = ["stable", "experimental"]
     
     def __init_subclass__(cls):
