@@ -29,11 +29,15 @@ class SplitStatsComputerService(BaseSplitStatsComputerService):
         for cls in self.services_cls:
             if isinstance(cls, BaseImageStatsService):
                 res = cls.compute_split_image_stats()
-                self.split_result(image_stats=res.image_stats)
+                #SplitStatsResult(image_stats=res.image_stats)
+                self.split_result.image_stats = res.image_stats
             elif isinstance(cls, BaseObjectStatsComputerService):
                 res = cls.compute_stats()
-                self.split_result(object_stats=res.object_stats,
-                                    split_dfs=res.split_dfs
-                                    )
+                #SplitStatsResult(object_stats=res.object_stats,
+                #                    split_dfs=res.split_dfs
+                #                    )
+                self.split_result.object_stats = res.object_stats
+                self.split_result.split_dfs = res.split_dfs
+        print(f"self.split_result: {self.split_result}")
         return self.split_result
                 
