@@ -1,16 +1,14 @@
 from .base_object_stats_computer import BaseObjectStatsComputer
 from .utils import compute_foreground_area_union
-from typing import Literal, Union
 import pandas as pd
 import numpy as np
-
 
 
 class ObjectStatsComputer(BaseObjectStatsComputer):
     name = "objectstats_computer"
     status = "stable"
         
-    def __init__(*, self, coco_ann_df: pd.DataFrame, 
+    def __init__(self, *, coco_ann_df: pd.DataFrame, 
                  bins=None, n_bins=5, strategy="quantile", 
                  **kwargs
                  ):
@@ -41,9 +39,6 @@ class ObjectStatsComputer(BaseObjectStatsComputer):
         # normalize
         self.df["relative_x_center"] = self.df["center_x"] / self.df["image_width"]
         self.df["relative_y_center"] = self.df["center_y"] / self.df["image_height"]
-        
-        #self.df["foreground_ratio"] = self.df["bbox_area"] / self.df["image_area"]               
-        #self.df["occupancy_per_image"] = self.df.groupby("image_id")["bbox_area"].transform("sum") / self.df["image_area"]
         self.df = compute_foreground_area_union(self.df)
         self.df["occupancy_per_image"] = self.df["foreground_union_area_per_image"] / self.df["image_area"]
         self.df["background_area_per_image"] = self.df["image_area"] - self.df["foreground_union_area_per_image"]
@@ -413,3 +408,5 @@ class ObjectStatsComputer(BaseObjectStatsComputer):
         self.df[name_bin_field_label_as] = pd.cut(self.df[field_to_bin], bins=bins, labels=labels, include_lowest=True)
         return self.df
     
+    def compute_object_stats(self,):
+        return self.summary()
