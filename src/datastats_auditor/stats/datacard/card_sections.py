@@ -45,14 +45,13 @@ def generate_data_metric_section(metric_heading, fig,
     img_b64 = fig_to_base64(fig)
     img_md = f"![splits](data:image/png;base64,{img_b64})"
 
-    md_content = f"""
-    ## {metric_heading}
+    md_content = f"""## {metric_heading}
     
-    ### {subheading}
+### {subheading}
 
-    {img_md}
+{img_md}
  
-    {footnote}
+{footnote}
     """
     return md_content
     
