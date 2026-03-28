@@ -1,12 +1,9 @@
 import pandas as pd
-import uuid
 from typing import List
-from ..stats.split_service.split_stat_service import SplitStatsComputerService
 from ..stats.split_service.base_split_service import BaseSplitStatsComputerService
 from ..stats.drift.base_drift_service import BaseDriftComputerService
 from ..stats.drift.base_drift import BaseDrift
-from ..stats.datacard.datacard_generator import create_data_card
-from ..stats.datacard.constants import PDF_PATH, METRICS, FIELD_TO_BIN
+from ..stats.datacard.constants import METRICS, FIELD_TO_BIN
 from ..stats.datacard.base_card_creator import BaseCardCreator
 from ..stats.datacard.core.io.baseio import BaseCardExporter
 
