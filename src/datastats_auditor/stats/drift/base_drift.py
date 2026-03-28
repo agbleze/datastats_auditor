@@ -21,7 +21,4 @@ class BaseDrift(ABC):
         
     @abstractmethod
     def compute_drift(self, *args, **kwargs):
-        raise NotImplementedError("Subclasses must implement the compute_drift method.")
-    
-    
-    
+        raise NotImplementedError("Subclasses must implement the compute_drift method.")  
