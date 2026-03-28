@@ -1,5 +1,4 @@
-from typing import List, Optional
-import numpy as np
+from typing import List
 from abc import ABC, abstractmethod
 from typing import Literal
 from ..registry import registry
@@ -22,6 +21,4 @@ class BaseDriftComputerService(ABC):
         
     @abstractmethod
     def compute_drift_metrics(self, *args, **kwargs) -> List[float]:
-        raise NotImplementedError("Subclasses must implement the compute_stats method.")
-    
-
+        raise NotImplementedError("Subclasses must implement the compute_drift_metrics method.")
