@@ -44,8 +44,6 @@ class DriftStatsComputer(BaseDrift):
         
         if self.strategy not in VALID_BINNING_STRATEGY:
             raise ValueError(f"strategy {self.strategy} is not valid: Valid strategy should be one {VALID_BINNING_STRATEGY}")
-        
-    
     
     def compute_bins(self, n_bins=None, field_to_bin=None, 
                     strategy=None,
@@ -103,7 +101,6 @@ class DriftStatsComputer(BaseDrift):
         self.comparison_distribution = self.assign_bins(distribution=self.comparison_distribution,
                                                         bins=bins, labels=labels
                                                         )
-        
         if metric is None:
             metric = self.metric
             
@@ -121,7 +118,6 @@ class DriftStatsComputer(BaseDrift):
                                                                  )
             
         return divergence_res
-    
     
     def compute_spatial_distribution(self, df,
                                     x_col="relative_x_center", 
