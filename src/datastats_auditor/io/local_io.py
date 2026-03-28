@@ -5,7 +5,6 @@ import numpy as np
 from PIL import Image
 
 
-
 class ImageBatchDataset(IterableDataset):
     name = "local_image_loader"
     status = "stable"
@@ -40,8 +39,3 @@ class ImageBatchDataset(IterableDataset):
     def __getitem__(self, idx):
         return self.paths[idx]
         
-
-
-class LocalStatsResultExporter():
-    def __init__(self):
-        pass
