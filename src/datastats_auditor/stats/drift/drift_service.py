@@ -17,7 +17,6 @@ class DriftComputerService(BaseDriftComputerService):
                  distributions: Dict[str, pd.DataFrame],
                 metrics: Union[str, List[str]],
                 field_to_bin: Union[str, List[str]],
-                
                 **kwargs
                 ):
         """
@@ -137,4 +136,3 @@ class DriftComputerService(BaseDriftComputerService):
                 "spatial_heatmap": self.spatial_heatmap,
                 "drift_plot": self.drift_plot
                 }    
-
