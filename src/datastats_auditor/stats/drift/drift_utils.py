@@ -3,7 +3,6 @@ from scipy.spatial.distance import jensenshannon
 from scipy.stats import wasserstein_distance, wasserstein_distance_nd
 
 
-
 def kl_divergence(p, q, eps=1e-12):
     p = np.asarray(p) + eps
     q = np.asarray(q) + eps
@@ -12,13 +11,11 @@ def kl_divergence(p, q, eps=1e-12):
     res = np.sum(p * np.log(p / q))  
     return res
 
-
 def kl_divergence_between_distributions(df1, df2, field_name, labels):
     p = df1[field_name].value_counts(normalize=True).reindex(labels, fill_value=0)
     q = df2[field_name].value_counts(normalize=True).reindex(labels, fill_value=0)
     kl = kl_divergence(p, q)
     return kl
-
 
 def js_divergence(p, q, eps=1e-12):
     p = np.asarray(p) + eps
@@ -28,7 +25,6 @@ def js_divergence(p, q, eps=1e-12):
     m = 0.5 * (p + q)
     kl_pm = kl_divergence(p, m)
     kl_qm = kl_divergence(q, m)
-    #js = 0.5 * (kl_pm + kl_qm)
     js = 0.5 * kl_pm + 0.5 * kl_qm
     return js
 
@@ -37,7 +33,6 @@ def js_divergence_between_distributions(df1, df2, field_name, labels):
     q = df2[field_name].value_counts(normalize=True).reindex(labels, fill_value=0)
     js = js_divergence(p, q)
     return js
-
 
 def compute_spatial_drift(spatial_A, spatial_B,
                           xy_colname="heatmap",
@@ -83,19 +78,14 @@ def compute_spatial_drift(spatial_A, spatial_B,
             "combined_score": combined,
             }
 
-
-
 def compute_quadrant_masses(heatmap):
     h = heatmap
     mid = h.shape[0] // 2
-
     Q1 = h[:mid, :mid].sum()
     Q2 = h[:mid, mid:].sum()
     Q3 = h[mid:, :mid].sum()
     Q4 = h[mid:, mid:].sum()
-
     return np.array([Q1, Q2, Q3, Q4])
-
 
 def compute_quadrant_drift(spatial_A, spatial_B):
     qA = compute_quadrant_masses(spatial_A["heatmap"])
