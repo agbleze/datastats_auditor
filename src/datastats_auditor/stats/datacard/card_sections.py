@@ -1,4 +1,3 @@
-
 import base64
 
 
@@ -6,7 +5,6 @@ def fig_to_base64(fig):
     img_bytes = fig.to_image(format="png")
     return base64.b64encode(img_bytes).decode("utf-8")
     
-
 def create_section(*args, **kwargs):
     kwargs = kwargs.get("kwargs")
     header = kwargs.get("header", "")
@@ -16,12 +14,9 @@ def create_section(*args, **kwargs):
 <H1 style="color:#2A7FFF; font-weight:bold;">
  {header}
 </H1>
-
 {sect_content}
-    
     """
     return section.strip()
-
 
 def create_section_head(**kwargs):
     header = kwargs.get("header", "")
@@ -31,13 +26,9 @@ def create_section_head(**kwargs):
 <H1 style="color:#2A7FFF; font-weight:bold;">
  {header}
 </H1>
-
-{section_content}
-    
+{section_content} 
     """
     return section.strip()
-    
-
     
 def generate_data_metric_section(metric_heading, fig,
                                  subheading="", footnote="",
@@ -55,24 +46,20 @@ def generate_data_metric_section(metric_heading, fig,
     """
     return md_content
     
-
-
 def create_drift_section(drift_result, metric_used="Jensen Shannon Divergence",
-                            drift_key='js_2d', 
-                            
-                            ):
+                        drift_key='js_2d', 
+                        ):
     section_list = []
     drift_plot = drift_result["drift_plot"]
     drift_spatial_heatmap = drift_result["spatial_heatmap"]
     spatial_drift = drift_result['spatial_drift']
     for idx, (distr_pair, fig) in enumerate(drift_plot.items()):
         heading = "Data Drift Detection on Data Attributes" if idx == 0 else ""
-        
         sec = generate_data_metric_section(metric_heading=heading,
-                                    fig=fig,
-                                    subheading=f"{metric_used} on {distr_pair} Distribution",
-                                    footnote="Score > 0.05 indicates statistically significant drift",
-                                    )
+                                            fig=fig,
+                                            subheading=f"{metric_used} on {distr_pair} Distribution",
+                                            footnote="Score > 0.05 indicates statistically significant drift",
+                                            )
         section_list.append(sec)
     
     for idx, (distr_pair, fig) in enumerate(drift_spatial_heatmap.items()):
@@ -86,16 +73,13 @@ def create_drift_section(drift_result, metric_used="Jensen Shannon Divergence",
     
     drift_section_content = "\n".join([i for i in section_list])
     return drift_section_content
-
-
-
-                
+       
 def create_scene_composition_section(scene_results, 
-                                        data_properites=["occupancy_per_image",
-                                                        "relative_bbox_area",
-                                                        "bbox_aspect_ratio"
-                                                        ],
-                                        ):
+                                    data_properites=["occupancy_per_image",
+                                                    "relative_bbox_area",
+                                                    "bbox_aspect_ratio"
+                                                    ],
+                                    ):
     contents_list = []
     for idx, prop in enumerate(data_properites):
         heading = "Scene composition" if idx == 0 else ""
@@ -108,4 +92,3 @@ def create_scene_composition_section(scene_results,
         contents_list.append(scene_content)
     scene_contents = "\n".join([i for i in contents_list])
     return scene_contents
-        
