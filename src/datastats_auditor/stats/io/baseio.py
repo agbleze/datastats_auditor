@@ -1,6 +1,5 @@
-
 from abc import ABC, abstractmethod
-from typing import Iterable, Protocol, Literal
+from typing import Iterable, Literal
 import pandas as pd
 from ..registry import registry
 
@@ -23,9 +22,7 @@ class IterableDataset(ABC):
     def __iter__(self, *args, **kwargs) -> Iterable:
         raise NotImplementedError("Subclasses must implement the __iter__ method.")
     
-     
-    
-    
+         
 class BaseAnnotationDFImporter(ABC):
     name: str = "base_annotation_df_importer"
     status: Literal["stable", "experimental"] = "stable"
@@ -45,9 +42,3 @@ class BaseAnnotationDFImporter(ABC):
     @abstractmethod
     def load(self, *args, **kwargs) -> pd.DataFrame:
         raise NotImplementedError("Subclasses must implement the load method.")
-
-    
-    
-
-        
-    
