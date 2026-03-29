@@ -1,8 +1,5 @@
 import numpy as np
 
-
-
-
 def compute_dataset_stats(dataloader):
     total_pixels = 0
     mean = None
@@ -47,21 +44,17 @@ def compute_dataset_stats(dataloader):
 
     var = M2 / total_pixels
 
-    return {
-        "mean": mean,
-        "var": var,
-        "min": cmin,
-        "max": cmax,
-        "std": np.sqrt(var),
-        "height_stats": {
-            "min": min(heights),
-            "max": max(heights),
-            "mean": np.mean(heights)
-        },
-        "width_stats": {
-            "min": min(widths),
-            "max": max(widths),
-            "mean": np.mean(widths)
-        }
-    }
-
+    return {"mean": mean,
+            "var": var,
+            "min": cmin,
+            "max": cmax,
+            "std": np.sqrt(var),
+            "height_stats": {"min": min(heights),
+                            "max": max(heights),
+                            "mean": np.mean(heights)
+                            },
+            "width_stats": {"min": min(widths),
+                            "max": max(widths),
+                            "mean": np.mean(widths)
+                            }
+            }
