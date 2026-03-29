@@ -1,8 +1,5 @@
-
-from typing import List, Optional
-import numpy as np
+from typing import List, Literal
 from abc import ABC, abstractmethod
-from typing import Literal
 from ..registry import registry
 
 
@@ -25,4 +22,3 @@ class BaseSplitStatsComputerService(ABC):
     @abstractmethod
     def compute_stats(self, *args, **kwargs) -> List[float]:
         raise NotImplementedError("Subclasses must implement the compute_stats method.")
-    
