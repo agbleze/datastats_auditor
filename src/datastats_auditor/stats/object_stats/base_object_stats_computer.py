@@ -1,7 +1,5 @@
-from typing import List, Optional
-import numpy as np
+from typing import List, Literal
 from abc import ABC, abstractmethod
-from typing import Literal
 from ..registry import registry
 
 
@@ -23,6 +21,4 @@ class BaseObjectStatsComputer(ABC):
         
     @abstractmethod
     def compute_object_stats(self, *args, **kwargs) -> List[float]:
-        raise NotImplementedError("Subclasses must implement the compute_image_stats method.")
-    
-    
+        raise NotImplementedError("Subclasses must implement the compute_object_stats method.")
