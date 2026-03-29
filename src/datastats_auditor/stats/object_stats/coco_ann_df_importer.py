@@ -1,4 +1,3 @@
-
 from ..io.baseio import BaseAnnotationDFImporter
 import json
 from pandas import json_normalize
@@ -38,11 +37,12 @@ def coco_annotation_to_df(coco_annotation_file):
                                                                     how="outer"
                                                                     )
     all_merged_df = annotations_imgs_cat_merge[['id_annotation', 'image_id','category_id', 'bbox', 'area', 'segmentation', 'iscrowd',
-                                'file_name', 'height', 'width', 'name', 'supercategory'
-                                ]]
+                                                'file_name', 'height', 'width', 'name', 'supercategory'
+                                                ]]
     all_merged_df.rename(columns={"name": "category_name",
                                   "height": "image_height",
-                                  "width": "image_width"}, 
+                                  "width": "image_width"
+                                  }, 
                          inplace=True
                          )
     all_merged_df.dropna(subset=["file_name"], inplace=True)
