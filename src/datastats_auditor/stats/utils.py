@@ -1,6 +1,10 @@
-
-
 import plotly.express as px
+from plotly.subplots import make_subplots
+import pandas as pd
+from typing import List
+import numpy as np
+import plotly.graph_objects as go
+from scipy.stats import gaussian_kde
 
 def plot_split_bin_bars(per_split_ratios, title="Split Size-Bin Ratios"):
     """
@@ -22,75 +26,53 @@ def plot_split_bin_bars(per_split_ratios, title="Split Size-Bin Ratios"):
     fig.update_layout(xaxis_title="Size Bin", yaxis_title="Ratio")
     return fig
 
-
-
 def plot_class_bin_bars(per_class_ratios, title="Per-Class Size-Bin Ratios"):
     """
     per_class_ratios: DataFrame index=class, columns=bins, values=ratio
     """
-    df = per_class_ratios.reset_index().melt(
-        id_vars="category_name", var_name="bin", value_name="ratio"
-    )
+    df = per_class_ratios.reset_index().melt(id_vars="category_name", 
+                                             var_name="bin", 
+                                             value_name="ratio"
+                                             )
 
-    fig = px.bar(
-        df,
-        x="category_name",
-        y="ratio",
-        color="bin",
-        barmode="stack",
-        title=title,
-        text_auto=".2f"
-    )
+    fig = px.bar(df,
+                x="category_name",
+                y="ratio",
+                color="bin",
+                barmode="stack",
+                title=title,
+                text_auto=".2f"
+                )
     fig.update_layout(xaxis_title="Class", yaxis_title="Ratio")
     fig.update_xaxes(tickangle=45)
     return fig
 
-
-
-
-import numpy as np
-import plotly.graph_objects as go
-from scipy.stats import gaussian_kde
-
 def plot_area_kde(df, title="KDE of Normalized BBox Area"):
     areas = df["bbox_area_norm"].clip(1e-9, 1.0)
     kde = gaussian_kde(areas)
-    
     xs = np.logspace(-9, 0, 400)
     ys = kde(xs)
-
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=xs, y=ys, mode="lines", fill="tozeroy"))
-    fig.update_layout(
-        title=title,
-        xaxis=dict(title="bbox_area_norm (log scale)", type="log"),
-        yaxis=dict(title="Density")
-    )
+    fig.update_layout(title=title,
+                        xaxis=dict(title="bbox_area_norm (log scale)", type="log"),
+                        yaxis=dict(title="Density")
+                    )
     return fig
-
-
 
 def plot_area_hist_log(df, bins=60, title="Log-Log Histogram of BBox Area"):
     areas = df["bbox_area_norm"].clip(1e-9, 1.0)
 
-    fig = px.histogram(
-        x=areas,
-        nbins=bins,
-        log_x=True,
-        log_y=True,
-        title=title
-    )
-    fig.update_layout(
-        xaxis_title="bbox_area_norm (log)",
-        yaxis_title="Count (log)"
-    )
+    fig = px.histogram(x=areas,
+                        nbins=bins,
+                        log_x=True,
+                        log_y=True,
+                        title=title
+                        )
+    fig.update_layout(xaxis_title="bbox_area_norm (log)",
+                        yaxis_title="Count (log)"
+                    )
     return fig
-
-
-
-# Anchor suggestion via K‑means on width/height
-# Assumes you have bbox_w, bbox_h, image_width, image_height.
-
 
 from sklearn.cluster import KMeans
 
@@ -116,19 +98,12 @@ def suggest_anchors(df, n_anchors=9, normalize=True, random_state=0):
 
     return anchors  # shape (n_anchors, 2) -> (w, h) normalized or absolute
 
-
-
-
-
-# Drift detection using KL divergence between bin distributions
-
 def kl_divergence(p, q, eps=1e-12):
     p = np.asarray(p, dtype=float) + eps
     q = np.asarray(q, dtype=float) + eps
     p /= p.sum()
     q /= q.sum()
     return np.sum(p * np.log(p / q))
-
 
 def split_kl_drift(per_split_ratios):
     """
@@ -144,7 +119,6 @@ def split_kl_drift(per_split_ratios):
             q = per_split_ratios.loc[s2].values
             kl_results[(s1, s2)] = kl_divergence(p, q)
     return kl_results
-
 
 def per_class_split_kl(per_class_split_ratios):
     """
@@ -173,3 +147,84 @@ def per_class_split_kl(per_class_split_ratios):
         for pair, val in d.items():
             out.loc[cls, pair] = val
     return out
+
+def plot_spatial_heatmaps(spatial_dict_A, spatial_dict_B, 
+                          names=("A", "B"),
+                          **kwargs
+                          ):
+    H_A = spatial_dict_A["heatmap"]
+    H_B = spatial_dict_B["heatmap"]
+    fig = make_subplots(rows=1, cols=2,
+                        subplot_titles=[f"{names[0]} Heatmap", f"{names[1]} Heatmap"]
+                        )
+
+    fig.add_trace(go.Heatmap(z=H_A, colorscale="Viridis"),
+                    row=1, col=1
+                )
+    fig.add_trace(go.Heatmap(z=H_B, colorscale="Viridis"),
+                    row=1, col=2
+                    )
+    annotations = []
+    for i in range(H_A.shape[0]): 
+        for j in range(H_A.shape[1]): 
+            annotations.append( dict( x=j, y=i, xref="x1", yref="y1", 
+                                     text=f"{H_A[i, j]:.3f}", 
+                                     showarrow=False, 
+                                     font=dict( color="black", 
+                                               size=7
+                                               ) 
+                                     ) 
+                               )
+    for i in range(H_B.shape[0]): 
+        for j in range(H_B.shape[1]): 
+            annotations.append( dict( x=j, y=i, xref="x2", yref="y2", text=f"{H_B[i, j]:.3f}", 
+                                     showarrow=False, 
+                                     font=dict( color="black",
+                                               size=7 
+                                               ) 
+                                     ) 
+                               )
+    fig.update_layout(height=kwargs.get("height", 400),
+                        width=kwargs.get("width", 700),
+                        coloraxis=dict(colorscale="Viridis"),
+                        showlegend=False,
+                        annotations=annotations,
+                        template=kwargs.get("template", "plotly_dark"),
+                        title=kwargs.get("title_text")
+                        )
+    fig.update_yaxes(autorange="reversed", row=1, col=1) 
+    fig.update_yaxes(autorange="reversed", row=1, col=2)
+
+    return fig
+
+def plot_drift_radar(drift_df, drift_scores_colname: List[float], 
+                     drift_properties_colname: List[str],
+                     **kwargs
+                     ):
+    fig = px.line_polar(drift_df,r=drift_scores_colname, 
+                        theta=drift_properties_colname,
+                        template=kwargs.get("template","plotly_dark"),
+                        title=kwargs.get("title"),
+                        width=kwargs.get("width", 700),
+                        height=kwargs.get("height", 500)
+                        )
+    return fig
+  
+def get_drift_result_as_df(drift_results, 
+                            distribution_pair: str = "('train', 'val')",
+                            property_field_name: str = "property",
+                            metric_name: str = "js"
+                            ):
+    drift_results.keys()
+    drift_property = []
+    drift_metric = []
+    for k, v in drift_results.items():
+        if k.startswith(distribution_pair) and k.endswith(metric_name):
+            drift_property.append(v[property_field_name])
+            drift_metric.append(v[metric_name])
+            
+    drift_dict = {"scores": drift_metric, 
+                "property": drift_property
+                }
+    df = pd.DataFrame(drift_dict)
+    return df
