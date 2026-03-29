@@ -2,7 +2,6 @@ from shapely.geometry import box
 from shapely.ops import unary_union
 
 
-
 def compute_foreground_area_union(df):
     def bbox_area_union(group):
         polys = []
@@ -23,5 +22,4 @@ def compute_foreground_area_union(df):
                 .rename("foreground_union_area_per_image")
                 .reset_index()
                 )
-
     return df.merge(ratios, on="image_id")
