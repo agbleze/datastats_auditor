@@ -21,7 +21,3 @@ class BaseImageStatsService(ABC):
     @abstractmethod
     def compute_split_image_stats(self, *args, **kwargs) -> List[float]:
         raise NotImplementedError("Subclasses must implement the compute_image_stats method.")
-    
-    
-    
-    
