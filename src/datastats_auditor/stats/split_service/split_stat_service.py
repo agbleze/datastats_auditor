@@ -1,4 +1,3 @@
-
 from .base_split_service import BaseSplitStatsComputerService
 from datastats_auditor.stats.image_stats.base_imagestat_service import BaseImageStatsService
 from datastats_auditor.stats.object_stats.base_object_stats_computer_service import BaseObjectStatsComputerService
@@ -33,4 +32,3 @@ class SplitStatsComputerService(BaseSplitStatsComputerService):
                 self.split_result.object_stats = res.object_stats
                 self.split_result.split_dfs = res.split_dfs
         return self.split_result
-                
