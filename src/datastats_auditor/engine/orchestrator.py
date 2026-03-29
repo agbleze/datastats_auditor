@@ -8,7 +8,6 @@ from ..stats.datacard.base_card_creator import BaseCardCreator
 from ..stats.datacard.core.io.baseio import BaseCardExporter
 
 
-
 def concat_split_dfs(split_dfs: dict):
     df_list = []
     for split_nm, df in split_dfs.items():
@@ -17,7 +16,6 @@ def concat_split_dfs(split_dfs: dict):
         
     split_df = pd.concat(df_list)
     return split_df
-
 
 def compute_stats_and_drift(split_stats_service: BaseSplitStatsComputerService,
                             drift_stats_service: BaseDriftComputerService,
@@ -57,7 +55,3 @@ def compute_stats_and_drift(split_stats_service: BaseSplitStatsComputerService,
     return {"split_stats_result": split_stats_res,
             "drift_results": drift_results
             }
-
-
-
-
