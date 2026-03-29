@@ -12,7 +12,6 @@ class ObjectStatsComputer(BaseObjectStatsComputer):
                  bins=None, n_bins=5, strategy="quantile", 
                  **kwargs
                  ):
-        
         self.df = coco_ann_df.copy()
         self._prepare()
         if not bins:
@@ -56,8 +55,7 @@ class ObjectStatsComputer(BaseObjectStatsComputer):
                               .rename("relative_bbox_area_variance_per_image")
                               )
         self.df = self.df.merge(relative_bbox_area_var, on="image_id", how="left")
-    
-    
+        
     def class_distribution(self):
         counts = self.df["category_name"].value_counts()
         ratios = self.df["category_name"].value_counts(normalize=True).to_dict()
@@ -65,13 +63,12 @@ class ObjectStatsComputer(BaseObjectStatsComputer):
         images_per_object = self.df.groupby("category_name").size()
         images_per_object_ratio = images_per_object / images_per_object.sum()
         
-        return {
-            "object_count": counts.to_dict(),
-            "object_ratios": ratios,
-            "imbalance_ratio": imbalance_ratio,
-            "images_per_object": images_per_object.to_dict(),
-            "images_per_object_ratio": images_per_object_ratio.to_dict()
-        }
+        return {"object_count": counts.to_dict(),
+                "object_ratios": ratios,
+                "imbalance_ratio": imbalance_ratio,
+                "images_per_object": images_per_object.to_dict(),
+                "images_per_object_ratio": images_per_object_ratio.to_dict()
+                }
         
     def bbox_geometry(self):
         objects_area_stats = {"mean": self.df.groupby("category_name")["bbox_area"].mean().to_dict(),
@@ -108,7 +105,6 @@ class ObjectStatsComputer(BaseObjectStatsComputer):
                         "min": self.df.groupby("category_name")["bbox_w"].min().to_dict(),
                         "max": self.df.groupby("category_name")["bbox_w"].max().to_dict()  
                     }
-                         
         
         objects_center_x = {"mean": self.df.groupby("category_name")["center_x"].mean().to_dict(),
                             "median": self.df.groupby("category_name")["center_x"].median().to_dict(),
@@ -116,7 +112,6 @@ class ObjectStatsComputer(BaseObjectStatsComputer):
                             "min": self.df.groupby("category_name")["center_x"].min().to_dict(),
                             "max": self.df.groupby("category_name")["center_x"].max().to_dict()
                             }
-                            
         
         objects_center_y = {"mean": self.df.groupby("category_name")["center_y"].mean().to_dict(),
                             "median": self.df.groupby("category_name")["center_y"].median().to_dict(),
@@ -126,22 +121,20 @@ class ObjectStatsComputer(BaseObjectStatsComputer):
                             }
                             
         objects_relative_x_center = {"mean": self.df.groupby("category_name")["relative_x_center"].mean().to_dict(),
-                                "median": self.df.groupby("category_name")["relative_x_center"].median().to_dict(),
-                                "std": self.df.groupby("category_name")["relative_x_center"].std().to_dict(),
-                                "min": self.df.groupby("category_name")["relative_x_center"].min().to_dict(),
-                                "max": self.df.groupby("category_name")["relative_x_center"].max().to_dict()
-                                }
+                                    "median": self.df.groupby("category_name")["relative_x_center"].median().to_dict(),
+                                    "std": self.df.groupby("category_name")["relative_x_center"].std().to_dict(),
+                                    "min": self.df.groupby("category_name")["relative_x_center"].min().to_dict(),
+                                    "max": self.df.groupby("category_name")["relative_x_center"].max().to_dict()
+                                    }
                                  
         objects_relative_y_center = {"mean": self.df.groupby("category_name")["relative_y_center"].mean().to_dict(),
-                                "median": self.df.groupby("category_name")["relative_y_center"].median().to_dict(),
-                                "std": self.df.groupby("category_name")["relative_y_center"].std().to_dict(),
-                                "min": self.df.groupby("category_name")["relative_y_center"].min().to_dict(),
-                                "max": self.df.groupby("category_name")["relative_y_center"].max().to_dict()
-                                }
-                        
+                                    "median": self.df.groupby("category_name")["relative_y_center"].median().to_dict(),
+                                    "std": self.df.groupby("category_name")["relative_y_center"].std().to_dict(),
+                                    "min": self.df.groupby("category_name")["relative_y_center"].min().to_dict(),
+                                    "max": self.df.groupby("category_name")["relative_y_center"].max().to_dict()
+                                    }
         
-        bbox_stats_area = {
-                            "mean": self.df["bbox_area"].mean(),
+        bbox_stats_area = {"mean": self.df["bbox_area"].mean(),
                             "median": self.df["bbox_area"].median(),
                             "std": self.df["bbox_area"].std(),
                             "min": self.df["bbox_area"].min(),
@@ -230,14 +223,13 @@ class ObjectStatsComputer(BaseObjectStatsComputer):
         heatmap_proba = heatmap / heatmap.sum()
         px = heatmap_proba.sum(axis=1)
         py = heatmap_proba.sum(axis=0)
-        res = {
-            "heatmap": heatmap,
-            "xedges": xedges,
-            "yedges": yedges,
-            "heatmap_proba": heatmap_proba,
-            "px": px,
-            "py": py
-        }
+        res = {"heatmap": heatmap,
+                "xedges": xedges,
+                "yedges": yedges,
+                "heatmap_proba": heatmap_proba,
+                "px": px,
+                "py": py
+            }
         return res
     
     def co_occurence(self):
@@ -277,8 +269,6 @@ class ObjectStatsComputer(BaseObjectStatsComputer):
         foreground_to_background_area_per_image_max = self.df["foreground_to_background_area_per_image"].max()
         foreground_to_background_area_per_image_median = self.df["foreground_to_background_area_per_image"].median()
         foreground_to_background_area_per_image_std = self.df["foreground_to_background_area_per_image"].std()
-
-
 
         object_foreground_to_background_area_per_image_mean = self.df.groupby("category_name")["foreground_to_background_area_per_image"].mean().to_dict()
         object_foreground_to_background_area_per_image_max = self.df.groupby("category_name")["foreground_to_background_area_per_image"].max().to_dict()
