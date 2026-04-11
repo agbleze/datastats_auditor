@@ -97,7 +97,6 @@ def run_datastats_auditor_with_config():
         
         orchestrator_params["card_creator"] = card_creater
         orchestrator_params.update(card_params)
-        
         card_components = card_config["components"]  
         
         for _comp_nm, compsetup in card_components.items():
