@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Literal, List
+from typing import Literal
 from ..registry import registry
 
 class BaseCardCreator(ABC):
